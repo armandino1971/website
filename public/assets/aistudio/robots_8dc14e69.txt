@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://opex-lean.eu/sitemap.xml

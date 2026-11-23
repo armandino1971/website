@@ -1,0 +1,8 @@
+{
+  "name": "OpEx Lean — Consultoria Lean & Excelência Operacional",
+  "description": "Consultoria prática de Excelência Operacional, Lean Manufacturing e Melhoria Contínua no terreno (Gemba) para PMEs industriais em Portugal e França. Inclui Simulador ROI, Fichas Técnicas e Radar de Maturidade Lean 1–9.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
