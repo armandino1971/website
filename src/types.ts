@@ -46,3 +46,30 @@ export interface DiagnosticSubmission {
   priority: string;
   notes: string;
 }
+
+export interface CaseStudyItem {
+  id: string;
+  sector: string;
+  meta: string;
+  title: string;
+  desc: string;
+  metric: string;
+  metricLabel: string;
+  method: string;
+  context: string;
+  duration: string;
+  teamScope: string;
+  beforeItems: string[];
+  interventionItems: string[];
+  kpis: { value: string; label: string; delta: string }[];
+}
+
+export interface TestimonialItem {
+  initials: string;
+  quote: string;
+  author: string;
+  role: string;
+  org: string;
+  sector: string;
+  focus: string;
+}

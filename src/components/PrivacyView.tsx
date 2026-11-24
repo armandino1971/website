@@ -8,7 +8,7 @@ interface PrivacyViewProps {
 
 export function PrivacyView({ lang, onNavigate }: PrivacyViewProps) {
   return (
-    <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-10">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-10">
       <div>
         <button
           type="button"
@@ -20,19 +20,48 @@ export function PrivacyView({ lang, onNavigate }: PrivacyViewProps) {
         </button>
       </div>
 
-      <div className="bg-slate-100 border border-slate-200 rounded-xl p-5 text-xs sm:text-sm text-slate-700 leading-relaxed">
-        <strong>Note d’information (FR) :</strong> Le siège social d’OpEx Lean étant établi au Portugal (Caxias / Oeiras), les mentions légales et la politique de confidentialité ci-dessous sont rédigées en langue portugaise conformément au RGPD européen (UE 2016/679) et à la législation portugaise applicable (Lei n.º 46/2021). Contact DPO / RGPD : <strong>geral@opex-lean.eu</strong>.
-      </div>
+      {lang === 'fr' && (
+        <div className="bg-slate-100 border border-slate-200 rounded-xl p-5 sm:p-6 text-xs sm:text-sm text-slate-700 leading-relaxed space-y-3">
+          <p className="font-semibold text-slate-950">
+            Synthèse RGPD (FR) — Protection des données &amp; Mentions légales
+          </p>
+          <p>
+            Le siège social d’OpEx Lean (Armandino Seixas, NIF 233429492, Caxias / Oeiras) étant établi au Portugal, le texte légal complet ci-dessous est rédigé en portugais conformément au RGPD européen (UE 2016/679) et à la loi portugaise n.º 46/2021.
+          </p>
+          <p>
+            <strong>Données collectées :</strong> uniquement les coordonnées saisies volontairement dans le formulaire de diagnostic (24 mois max pour les contacts, aucun cookie publicitaire). <strong>Contact RGPD / DPO :</strong>{' '}
+            <a href="mailto:geral@opex-lean.eu" className="font-semibold text-[#D96B43] hover:underline">
+              geral@opex-lean.eu
+            </a>
+            .
+          </p>
+          <div className="flex flex-wrap items-center gap-4 pt-1 text-xs font-semibold">
+            <a href="#privacidade-sec" className="text-slate-900 hover:text-[#D96B43] underline underline-offset-4">
+              1. Politique de Confidentialité ↓
+            </a>
+            <a href="#mencoes-sec" className="text-slate-900 hover:text-[#D96B43] underline underline-offset-4">
+              2. Mentions Légales ↓
+            </a>
+          </div>
+        </div>
+      )}
 
-      <section className="bg-white rounded-2xl p-8 sm:p-12 border border-slate-200 space-y-8">
+      <section id="privacidade-sec" className="bg-white rounded-2xl p-8 sm:p-12 border border-slate-200 space-y-8 scroll-mt-20">
         <div className="border-b border-slate-200 pb-6">
           <p className="text-[#D96B43] font-semibold text-xs uppercase tracking-wider">
             Conforme RGPD e Lei n.º 46/2021
           </p>
           <h1 className="font-display font-extrabold text-3xl sm:text-4xl text-slate-950 mt-1">
             Política de Privacidade
+            {lang === 'fr' && (
+              <span className="block text-lg sm:text-xl font-semibold text-slate-500 mt-1">
+                Politique de Confidentialité (Texte officiel PT)
+              </span>
+            )}
           </h1>
-          <p className="text-xs text-slate-500 mt-2">Data da última atualização: 18/11/2026</p>
+          <p className="text-xs text-slate-500 mt-2">
+            {lang === 'fr' ? 'Dernière mise à jour : 18/11/2026' : 'Data da última atualização: 18/11/2026'}
+          </p>
         </div>
 
         <div className="space-y-6 text-slate-700 text-sm sm:text-base leading-relaxed">
@@ -127,15 +156,22 @@ export function PrivacyView({ lang, onNavigate }: PrivacyViewProps) {
         </div>
       </section>
 
-      <section className="bg-white rounded-2xl p-8 sm:p-12 border border-slate-200 space-y-8">
+      <section id="mencoes-sec" className="bg-white rounded-2xl p-8 sm:p-12 border border-slate-200 space-y-8 scroll-mt-20">
         <div className="border-b border-slate-200 pb-6">
           <p className="text-[#D96B43] font-semibold text-xs uppercase tracking-wider">
             Decreto-Lei n.º 111/2018 e Lei n.º 7/2004
           </p>
           <h2 className="font-display font-extrabold text-3xl sm:text-4xl text-slate-950 mt-1">
             Informação Legal · Menções Legais
+            {lang === 'fr' && (
+              <span className="block text-lg sm:text-xl font-semibold text-slate-500 mt-1">
+                Mentions Légales Officielles
+              </span>
+            )}
           </h2>
-          <p className="text-xs text-slate-500 mt-2">Data da última atualização: 18/11/2026</p>
+          <p className="text-xs text-slate-500 mt-2">
+            {lang === 'fr' ? 'Dernière mise à jour : 18/11/2026' : 'Data da última atualização: 18/11/2026'}
+          </p>
         </div>
 
         <div className="space-y-6 text-slate-700 text-sm sm:text-base leading-relaxed">
@@ -179,6 +215,6 @@ export function PrivacyView({ lang, onNavigate }: PrivacyViewProps) {
           </div>
         </div>
       </section>
-    </main>
+    </div>
   );
 }

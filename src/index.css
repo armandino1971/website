@@ -70,4 +70,20 @@ input[type="range"].opex-slider::-moz-range-thumb {
     break-inside: avoid;
     box-shadow: none !important;
   }
+  body.roi-print-mode section:not(#simulador) {
+    display: none !important;
+  }
+  body.roi-print-mode #simulador {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    padding: 0 !important;
+  }
+  body.roi-print-mode #simulador * {
+    color: #0f172a !important;
+    border-color: #cbd5e1 !important;
+  }
+  body.roi-print-mode #simulador .bg-slate-900,
+  body.roi-print-mode #simulador .bg-\[\#0F172A\] {
+    background: #f8fafc !important;
+  }
 }

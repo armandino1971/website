@@ -26,10 +26,10 @@ export function Footer({ lang, onChangeLang, onNavigate, onOpenCookieBanner }: F
               <img
                 src="/assets/aistudio/logo-opex-lean_d2b62a02.png"
                 alt="OpEx Lean"
-                width={32}
-                height={32}
+                width={36}
+                height={36}
                 referrerPolicy="no-referrer"
-                className="w-8 h-8 rounded-md object-cover bg-black"
+                className="w-9 h-9 rounded-md object-contain"
               />
               <span className="font-display font-extrabold text-xl text-white">
                 OpEx <span className="text-[#D96B43]">Lean</span>
@@ -69,6 +69,21 @@ export function Footer({ lang, onChangeLang, onNavigate, onOpenCookieBanner }: F
               <li>
                 <button type="button" onClick={() => onNavigate('home', 'metodologia')} className="hover:text-white transition-colors cursor-pointer">
                   {nav.methodology}
+                </button>
+              </li>
+              <li>
+                <button type="button" onClick={() => onNavigate('home', 'fundador')} className="hover:text-white transition-colors cursor-pointer">
+                  {nav.experience}
+                </button>
+              </li>
+              <li>
+                <button type="button" onClick={() => onNavigate('home', 'casos')} className="hover:text-white transition-colors cursor-pointer">
+                  {f.casesLink}
+                </button>
+              </li>
+              <li>
+                <button type="button" onClick={() => onNavigate('home', 'depoimentos')} className="hover:text-white transition-colors cursor-pointer">
+                  {f.testimonialsLink}
                 </button>
               </li>
               <li>

@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Check,
   Copy,
+  Download,
   Eye,
   Plus,
   Printer,
@@ -10,9 +11,11 @@ import {
   Search,
   Settings2,
   Trash2,
+  Upload,
   X,
 } from 'lucide-react';
 import { AppView, EvolutionSnapshot, Language, TechnicalToolSpec } from '../types';
+import { useModalA11y } from '../utils/useModalA11y';
 import {
   axesInfo,
   gembaFlashCriteria,
@@ -30,8 +33,7 @@ const STORAGE_KEY_HISTORY = 'opex_lean_history_v1';
 
 interface PrinciplesViewProps {
   lang: Language;
-  onChangeLang: (lang: Language) => void;
-  onNavigate: (view: AppView, sectionId?: string) => void;
+  onNavigate: (view: AppView, sectionId?: string, prefillNotes?: string) => void;
 }
 
 function sanitizeScores(arr: unknown): number[] | null {
@@ -47,7 +49,7 @@ function calcAvg(scores: number[]): number {
   return scores.reduce((acc, v) => acc + v, 0) / 9;
 }
 
-export function PrinciplesView({ lang, onChangeLang, onNavigate }: PrinciplesViewProps) {
+export function PrinciplesView({ lang, onNavigate }: PrinciplesViewProps) {
   // Persistent Evolution History
   const [history, setHistory] = useState<EvolutionSnapshot[]>(() => {
     try {
@@ -97,6 +99,10 @@ export function PrinciplesView({ lang, onChangeLang, onNavigate }: PrinciplesVie
   const [activePointBanner, setActivePointBanner] = useState<{ title: string; score: string } | null>(null);
   const [drawerTool, setDrawerTool] = useState<TechnicalToolSpec | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const drawerModalRef = useRef<HTMLDivElement>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
+
+  useModalA11y(drawerTool !== null, drawerModalRef, () => setDrawerTool(null));
 
   useEffect(() => {
     try {
@@ -121,14 +127,6 @@ export function PrinciplesView({ lang, onChangeLang, onNavigate }: PrinciplesVie
       // ignore
     }
   }, [history]);
-
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setDrawerTool(null);
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -243,14 +241,23 @@ export function PrinciplesView({ lang, onChangeLang, onNavigate }: PrinciplesVie
 
   const copyDiagnosticReport = async () => {
     const avgStr = currentAvg.toFixed(1);
+    const deltaStr = `${deltaPts >= 0 ? '+' : ''}${deltaPts.toFixed(1)} pts`;
     const header =
       lang === 'pt'
-        ? `OPEX LEAN — DIAGNÓSTICO DE MATURIDADE LEAN (${avgStr} / 9.0)\n`
-        : `OPEX LEAN — DIAGNOSTIC DE MATURITÉ LEAN (${avgStr} / 9.0)\n`;
+        ? `OPEX LEAN — DIAGNÓSTICO DE MATURIDADE LEAN (${avgStr} / 9.0 · ${maturityLabel} · Δ ${deltaStr})\n`
+        : `OPEX LEAN — DIAGNOSTIC DE MATURITÉ LEAN (${avgStr} / 9.0 · ${maturityLabel} · Δ ${deltaStr})\n`;
     const lines = radarPrinciplesConfig
       .map((cfg, idx) => `- ${cfg.title[lang]}: ${scores[idx]}/9`)
       .join('\n');
-    const fullText = `${header}${'='.repeat(45)}\n${lines}\n\nhttps://opex-lean.eu/9-principios.html`;
+    const leversTitle = lang === 'pt' ? 'Top 3 Alavancas Prioritárias:' : 'Top 3 Leviers Prioritaires :';
+    const leversLines = priorityLevers
+      .map((l, i) => `  #${i + 1} ${l.cfg.title[lang]} (${l.score}/9) — ${l.cfg.action[lang]}`)
+      .join('\n');
+    const shareUrl =
+      lang === 'fr'
+        ? 'https://opex-lean.eu/?view=principles&lang=fr'
+        : 'https://opex-lean.eu/?view=principles';
+    const fullText = `${header}${'='.repeat(52)}\n${lines}\n\n${leversTitle}\n${leversLines}\n\n${shareUrl}`;
 
     try {
       await navigator.clipboard.writeText(fullText);
@@ -266,13 +273,93 @@ export function PrinciplesView({ lang, onChangeLang, onNavigate }: PrinciplesVie
     }
     showToast(
       lang === 'pt'
-        ? 'Relatório copiado para a área de transferência!'
-        : 'Rapport copié dans le presse-papiers !'
+        ? 'Relatório executivo copiado!'
+        : 'Synthèse exécutive copiée !'
     );
+  };
+
+  const exportDiagnosticJson = () => {
+    const payload = {
+      app: 'opex-lean',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      scores,
+      gembaChecks,
+      history,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `opex-lean-radar-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast(lang === 'pt' ? 'Diagnóstico exportado (JSON)' : 'Diagnostic exporté (JSON)');
+  };
+
+  const handleImportDiagnosticJson = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text) as {
+        scores?: unknown;
+        gembaChecks?: unknown;
+        history?: unknown;
+      };
+      const cleanScores = sanitizeScores(parsed?.scores);
+      if (!cleanScores) {
+        showToast(lang === 'pt' ? 'Ficheiro JSON inválido.' : 'Fichier JSON invalide.');
+        return;
+      }
+      setScores(cleanScores);
+
+      if (Array.isArray(parsed.gembaChecks) && parsed.gembaChecks.length === 5) {
+        setGembaChecks(parsed.gembaChecks.map(Boolean));
+      }
+
+      if (Array.isArray(parsed.history) && parsed.history.length > 0) {
+        const validHistory = parsed.history
+          .filter(
+            (item): item is EvolutionSnapshot =>
+              Boolean(item) &&
+              typeof item === 'object' &&
+              typeof (item as EvolutionSnapshot).date === 'string' &&
+              Boolean(sanitizeScores((item as EvolutionSnapshot).scores))
+          )
+          .map((item, idx) => ({
+            id: typeof item.id === 'string' ? item.id : `imp-${Date.now()}-${idx}`,
+            date: item.date.slice(0, 10),
+            labelPt: typeof item.labelPt === 'string' ? item.labelPt : `Auditoria #${idx + 1}`,
+            labelFr: typeof item.labelFr === 'string' ? item.labelFr : `Audit #${idx + 1}`,
+            scores: sanitizeScores(item.scores)!,
+          }));
+        if (validHistory.length > 0) {
+          setHistory(validHistory);
+          setSelectedBaselineIdx(0);
+        }
+      }
+      showToast(lang === 'pt' ? 'Diagnóstico importado com sucesso!' : 'Diagnostic importé avec succès !');
+    } catch {
+      showToast(lang === 'pt' ? 'Erro ao ler o ficheiro JSON.' : 'Erreur lors de la lecture du JSON.');
+    }
   };
 
   // Filter visibility for principles & outcome axis
   const q = searchQuery.trim().toLowerCase();
+  const matchesPrinciple = (card: (typeof principleCards)[number]) => {
+    if (axisFilter !== 'all' && axisFilter !== card.axis) return false;
+    if (!q) return true;
+    const hay = `${card.keywords} ${card.title[lang]} ${card.tools.join(' ')} ${card.blocks
+      .map((b) => `${b.title[lang]} ${b.text[lang]}`)
+      .join(' ')}`.toLowerCase();
+    return hay.includes(q);
+  };
+  const matchedPrincipleCount = principleCards.filter(matchesPrinciple).length;
   const visibleAxes = axesInfo.filter((axis) => {
     if (axisFilter !== 'all' && axisFilter !== axis.id) return false;
     if (axis.id === '06') {
@@ -281,15 +368,7 @@ export function PrinciplesView({ lang, onChangeLang, onNavigate }: PrinciplesVie
         (c) => c.title[lang].toLowerCase().includes(q) || c.text[lang].toLowerCase().includes(q)
       );
     }
-    const matchingCards = principleCards.filter((card) => {
-      if (card.axis !== axis.id) return false;
-      if (!q) return true;
-      const hay = `${card.keywords} ${card.title[lang]} ${card.tools.join(' ')} ${card.blocks
-        .map((b) => `${b.title[lang]} ${b.text[lang]}`)
-        .join(' ')}`.toLowerCase();
-      return hay.includes(q);
-    });
-    return matchingCards.length > 0;
+    return principleCards.some((card) => card.axis === axis.id && matchesPrinciple(card));
   });
 
   // Radar SVG geometry
@@ -408,14 +487,23 @@ export function PrinciplesView({ lang, onChangeLang, onNavigate }: PrinciplesVie
       : `Diagnostic OpEx Lean (${avgStr}/9) - 9 Principes`
   )}&body=${encodeURIComponent(summaryLines)}`;
 
+  const radarPrefillNotes =
+    lang === 'fr'
+      ? `[Autodiagnostic Radar : ${avgStr}/9.0 (${maturityLabel}) | Top 3 Leviers : ${priorityLevers
+          .map((r) => `${r.cfg.title.fr} (${r.score}/9)`)
+          .join(', ')}]`
+      : `[Autodiagnóstico Radar: ${avgStr}/9.0 (${maturityLabel}) | Top 3 Alavancas: ${priorityLevers
+          .map((r) => `${r.cfg.title.pt} (${r.score}/9)`)
+          .join(', ')}]`;
+
   return (
     <div className="bg-[#F8F9FA]">
-      {/* Toast Notification */}
+      {/* Toast Notification (positioned cleanly above FloatingWhatsApp) */}
       {toastMsg && (
         <div
           role="status"
           aria-live="polite"
-          className="fixed bottom-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-lg bg-[#0F172A] text-white border border-slate-700 shadow-2xl font-mono text-xs"
+          className="fixed bottom-24 right-5 sm:right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-lg bg-[#0F172A] text-white border border-slate-700 shadow-2xl font-mono text-xs"
         >
           <Check className="w-4 h-4 text-[#D96B43]" />
           <span>{toastMsg}</span>
@@ -424,38 +512,16 @@ export function PrinciplesView({ lang, onChangeLang, onNavigate }: PrinciplesVie
 
       {/* 1. HERO & ARCHITECTURAL 6-AXIS ROADMAP */}
       <section className="bg-[#0F172A] text-white border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-14 lg:pb-18">
-          {/* Sub-bar: Back to Home + Language Switch */}
-          <div className="flex flex-wrap items-center justify-between gap-4 pb-8 border-b border-slate-800 mb-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 lg:pt-12 pb-14 lg:pb-18">
+          <div className="mb-6 no-print">
             <button
               type="button"
               onClick={() => onNavigate('home')}
-              className="inline-flex items-center gap-2 text-xs sm:text-sm font-medium text-slate-300 hover:text-white transition-colors cursor-pointer"
+              className="inline-flex items-center gap-2 text-xs font-semibold text-slate-300 hover:text-[#D96B43] transition-colors cursor-pointer"
             >
-              <ArrowLeft className="w-4 h-4" />
-              <span>{lang === 'pt' ? 'Voltar à página inicial OpEx Lean' : 'Retour à l’accueil OpEx Lean'}</span>
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>{lang === 'fr' ? 'Retour à l’accueil' : 'Voltar à página inicial'}</span>
             </button>
-
-            <div className="inline-flex items-center p-1 rounded-lg bg-slate-900 border border-slate-700" role="group" aria-label="Language switcher">
-              <button
-                type="button"
-                onClick={() => onChangeLang('pt')}
-                className={`px-3 py-1 text-xs font-mono font-semibold rounded-md transition-colors cursor-pointer ${
-                  lang === 'pt' ? 'bg-[#D96B43] text-white' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                PT-PT
-              </button>
-              <button
-                type="button"
-                onClick={() => onChangeLang('fr')}
-                className={`px-3 py-1 text-xs font-mono font-semibold rounded-md transition-colors cursor-pointer ${
-                  lang === 'fr' ? 'bg-[#D96B43] text-white' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                FR
-              </button>
-            </div>
           </div>
 
           <div className="grid lg:grid-cols-12 gap-10 items-stretch">
@@ -560,36 +626,44 @@ export function PrinciplesView({ lang, onChangeLang, onNavigate }: PrinciplesVie
               ))}
             </div>
 
-            <div className="relative w-full lg:w-80">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={
-                  lang === 'pt'
-                    ? 'Pesquisar princípio ou ferramenta (5S, VSM, PDCA...)'
-                    : 'Rechercher principe ou outil (5S, VSM, PDCA...)'
-                }
-                className="w-full pl-9 pr-8 py-2 rounded-lg bg-[#F8F9FA] border border-slate-200 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#D96B43] focus:bg-white"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  aria-label="Limpar pesquisa"
-                  className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-900 cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
+            <div className="flex items-center gap-3 w-full lg:w-auto">
+              <div className="relative flex-1 lg:w-80">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={
+                    lang === 'pt'
+                      ? 'Pesquisar princípio ou ferramenta (5S, VSM, PDCA...)'
+                      : 'Rechercher principe ou outil (5S, VSM, PDCA...)'
+                  }
+                  className="w-full pl-9 pr-8 py-2 rounded-lg bg-[#F8F9FA] border border-slate-200 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#D96B43] focus:bg-white"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    aria-label={lang === 'fr' ? 'Effacer la recherche' : 'Limpar pesquisa'}
+                    className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-900 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+              <span
+                aria-live="polite"
+                className="font-mono text-xs font-semibold text-slate-500 tabular-nums whitespace-nowrap shrink-0"
+              >
+                {matchedPrincipleCount} / 9
+              </span>
             </div>
           </div>
         </div>
       </section>
 
       {/* 3. PRINCIPLES SECTIONS */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-16">
         {visibleAxes.length === 0 && (
           <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center">
             <p className="font-semibold text-sm text-slate-900">
@@ -769,8 +843,20 @@ export function PrinciplesView({ lang, onChangeLang, onNavigate }: PrinciplesVie
                     : 'Diagnostic Visuel Gemba : Opération dans le Rouge vs. Vert'}
                 </h2>
               </div>
-              <div className="font-mono text-xs font-bold text-slate-950 tabular-nums">
-                {greenCount} / 5 {lang === 'pt' ? 'critérios no verde' : 'critères au vert'}
+              <div className="flex items-center gap-3">
+                <span className="font-mono text-xs font-bold text-slate-950 tabular-nums">
+                  {greenCount} / 5 {lang === 'pt' ? 'critérios no verde' : 'critères au vert'}
+                </span>
+                {greenCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setGembaChecks([false, false, false, false, false])}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition-colors cursor-pointer no-print"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>{lang === 'pt' ? 'Repor' : 'Réinitialiser'}</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -825,6 +911,28 @@ export function PrinciplesView({ lang, onChangeLang, onNavigate }: PrinciplesVie
                   </button>
                 );
               })}
+            </div>
+
+            <div className="rounded-xl bg-[#F8F9FA] border border-slate-200 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+              <span className="text-slate-700 font-medium">
+                {greenCount <= 2
+                  ? lang === 'pt'
+                    ? 'Alerta prioritário: fundações visuais ausentes no Gemba. Forte potencial imediato de ganho de capacidade.'
+                    : 'Alerte prioritaire : fondations visuelles absentes au Gemba. Fort potentiel immédiat de gain de capacité.'
+                  : greenCount <= 4
+                  ? lang === 'pt'
+                    ? 'Base parcial: consolide os critérios ainda a vermelho para eliminar desvios diários.'
+                    : 'Base partielle : consolidez les critères encore au rouge pour supprimer les dérives quotidiennes.'
+                  : lang === 'pt'
+                  ? 'Excelente disciplina visual no Gemba! Avance para o Radar 1–9 abaixo para otimizar fluxos e EBITDA.'
+                  : 'Excellente discipline visuelle sur le Gemba ! Passez au Radar 1–9 ci-dessous pour optimiser les flux et l’EBITDA.'}
+              </span>
+              <a
+                href="#radar-diagnostico"
+                className="font-mono font-semibold text-[#D96B43] hover:underline whitespace-nowrap shrink-0"
+              >
+                {lang === 'pt' ? 'Avaliar Radar 1–9 →' : 'Évaluer Radar 1–9 →'}
+              </a>
             </div>
           </div>
         </section>
@@ -905,7 +1013,7 @@ export function PrinciplesView({ lang, onChangeLang, onNavigate }: PrinciplesVie
               <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 shrink-0">
                 <input
                   type="date"
-                  aria-label="Data da avaliação"
+                  aria-label={lang === 'fr' ? 'Date d’évaluation' : 'Data da avaliação'}
                   value={snapshotDate}
                   onChange={(e) => setSnapshotDate(e.target.value)}
                   className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-[#D96B43]"
@@ -933,14 +1041,34 @@ export function PrinciplesView({ lang, onChangeLang, onNavigate }: PrinciplesVie
             {/* Left: 9 Sliders */}
             <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200">
-                <h3 className="font-semibold text-sm sm:text-base text-slate-950">
-                  {lang === 'pt'
-                    ? 'Avalie a sua organização em cada princípio (1 = Inicial · 9 = Referência)'
-                    : 'Évaluez votre organisation sur chaque principe (1 = Initial · 9 = Référence)'}
-                </h3>
-                <span className="text-xs font-mono text-slate-500">
-                  {lang === 'pt' ? 'Guardado localmente' : 'Sauvegarde locale'}
-                </span>
+                <div>
+                  <h3 className="font-semibold text-sm sm:text-base text-slate-950">
+                    {lang === 'pt'
+                      ? 'Avalie a sua organização em cada princípio (1–9)'
+                      : 'Évaluez votre organisation sur chaque principe (1–9)'}
+                  </h3>
+                  <p className="font-mono text-[11px] text-slate-500 mt-0.5">
+                    {lang === 'pt'
+                      ? '1–3 Reativo · 4–6 Estruturado · 7–9 Referência'
+                      : '1–3 Réactif · 4–6 Structuré · 7–9 Référence'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 no-print">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setScores([5, 5, 5, 5, 5, 5, 5, 5, 5]);
+                      showToast(lang === 'fr' ? 'Scores réinitialisés à 5/9' : 'Pontuações repostas para 5/9');
+                    }}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>{lang === 'fr' ? 'Réinit. (5/9)' : 'Repor (5/9)'}</span>
+                  </button>
+                  <span className="text-xs font-mono text-slate-500">
+                    {lang === 'pt' ? 'Guardado localmente' : 'Sauvegarde locale'}
+                  </span>
+                </div>
               </div>
 
               <div className="space-y-3">
@@ -1152,7 +1280,7 @@ export function PrinciplesView({ lang, onChangeLang, onNavigate }: PrinciplesVie
                     </a>
                     <button
                       type="button"
-                      onClick={() => onNavigate('home', 'diagnostico')}
+                      onClick={() => onNavigate('home', 'diagnostico', radarPrefillNotes)}
                       className="px-3.5 py-2 rounded-lg bg-[#D96B43] hover:bg-[#B8532D] text-white font-mono text-xs font-semibold transition-colors cursor-pointer"
                     >
                       {lang === 'pt' ? 'Agendar Diagnóstico' : 'Planifier Diagnostic'}
@@ -1182,6 +1310,30 @@ export function PrinciplesView({ lang, onChangeLang, onNavigate }: PrinciplesVie
               </div>
 
               <div className="flex flex-wrap items-center gap-2 no-print">
+                <input
+                  ref={importInputRef}
+                  type="file"
+                  accept="application/json,.json"
+                  onChange={handleImportDiagnosticJson}
+                  className="sr-only"
+                  aria-label={lang === 'pt' ? 'Importar ficheiro JSON' : 'Importer un fichier JSON'}
+                />
+                <button
+                  type="button"
+                  onClick={exportDiagnosticJson}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0F172A] hover:bg-slate-800 text-white font-mono text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{lang === 'pt' ? 'Exportar JSON' : 'Exporter JSON'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => importInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#F8F9FA] hover:bg-slate-100 text-slate-800 border border-slate-200 font-mono text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>{lang === 'pt' ? 'Importar JSON' : 'Importer JSON'}</span>
+                </button>
                 <button
                   type="button"
                   onClick={loadDemoHistory}
@@ -1337,8 +1489,17 @@ export function PrinciplesView({ lang, onChangeLang, onNavigate }: PrinciplesVie
                     {evolutionGeometry.points.map((pt) => (
                       <g
                         key={pt.snap.id}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`${pt.snap.date} — ${getSnapLabel(pt.snap)} (${pt.avg.toFixed(1)}/9.0)`}
                         onClick={() => loadSnapshotIntoRadar(pt.idx)}
-                        className="cursor-pointer"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            loadSnapshotIntoRadar(pt.idx);
+                          }
+                        }}
+                        className="cursor-pointer focus-visible:outline-2 focus-visible:outline-[#D96B43] focus-visible:outline-offset-2"
                       >
                         <circle
                           cx={pt.x}
@@ -1403,22 +1564,17 @@ export function PrinciplesView({ lang, onChangeLang, onNavigate }: PrinciplesVie
                     return (
                       <div
                         key={snap.id}
-                        onClick={() => loadSnapshotIntoRadar(idx)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            loadSnapshotIntoRadar(idx);
-                          }
-                        }}
-                        className={`p-3 rounded-lg border flex items-center justify-between gap-2 cursor-pointer transition-colors ${
+                        className={`p-3 rounded-lg border flex items-center justify-between gap-2 transition-colors ${
                           isBaseline
                             ? 'bg-[#0F172A] text-white border-[#0F172A]'
                             : 'bg-white hover:bg-slate-50 text-slate-900 border-slate-200'
                         }`}
                       >
-                        <div className="min-w-0">
+                        <button
+                          type="button"
+                          onClick={() => loadSnapshotIntoRadar(idx)}
+                          className="min-w-0 flex-1 text-left cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D96B43]"
+                        >
                           <div className="flex items-center gap-2 font-mono text-[11px]">
                             <span className={isBaseline ? 'text-[#D96B43]' : 'text-slate-500'}>{snap.date}</span>
                             {isBaseline && (
@@ -1426,16 +1582,13 @@ export function PrinciplesView({ lang, onChangeLang, onNavigate }: PrinciplesVie
                             )}
                           </div>
                           <p className="text-xs font-semibold truncate mt-0.5">{getSnapLabel(snap)}</p>
-                        </div>
+                        </button>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="font-mono text-xs font-bold text-[#D96B43] tabular-nums">{avg}</span>
                           <button
                             type="button"
-                            aria-label="Eliminar marco"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteSnapshot(idx);
-                            }}
+                            aria-label={lang === 'pt' ? 'Eliminar marco' : 'Supprimer ce jalon'}
+                            onClick={() => deleteSnapshot(idx)}
                             className={`p-1 rounded transition-colors cursor-pointer ${
                               isBaseline
                                 ? 'text-slate-400 hover:text-white hover:bg-slate-800'
@@ -1528,7 +1681,7 @@ export function PrinciplesView({ lang, onChangeLang, onNavigate }: PrinciplesVie
             </div>
           </div>
         </section>
-      </main>
+      </div>
 
       {/* Technical Tool Drawer / Modal */}
       {drawerTool && (
@@ -1540,8 +1693,10 @@ export function PrinciplesView({ lang, onChangeLang, onNavigate }: PrinciplesVie
           className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4"
         >
           <div
+            ref={drawerModalRef}
+            tabIndex={-1}
             onClick={(e) => e.stopPropagation()}
-            className="bg-white w-full max-w-xl rounded-2xl border border-slate-200 shadow-2xl overflow-hidden"
+            className="bg-white w-full max-w-xl rounded-2xl border border-slate-200 shadow-2xl overflow-hidden focus:outline-none"
           >
             <div className="bg-[#0F172A] text-white px-6 py-5 flex items-start justify-between gap-4 border-b border-slate-800">
               <div>
@@ -1555,7 +1710,7 @@ export function PrinciplesView({ lang, onChangeLang, onNavigate }: PrinciplesVie
               <button
                 type="button"
                 onClick={() => setDrawerTool(null)}
-                aria-label="Fechar"
+                aria-label={lang === 'fr' ? 'Fermer' : 'Fechar'}
                 className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />

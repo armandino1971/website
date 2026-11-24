@@ -1,14 +1,21 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import {
+  ArrowLeft,
   ArrowRight,
   Check,
+  ChevronDown,
   Copy,
+  Factory,
   Lock,
+  Pause,
+  Play,
   Printer,
+  Quote,
   ShieldCheck,
   X,
 } from 'lucide-react';
 import { AppView, DiagnosticSubmission, IndustrialTool, Language, ToolCategory } from '../types';
+import { useModalA11y } from '../utils/useModalA11y';
 import {
   CONTACT_EMAIL,
   homeCopy,
@@ -17,13 +24,77 @@ import {
   WHATSAPP_NUMBER,
 } from '../data/homeData';
 
-interface HomeViewProps {
-  lang: Language;
-  onChangeLang: (lang: Language) => void;
-  onNavigate: (view: AppView, sectionId?: string) => void;
+const HERO_GEMBA_IMAGE = '/src/assets/images/hero_gemba_factory_1795511926506.jpg';
+const GEMBA_BOARD_IMAGE = '/src/assets/images/gemba_visual_board_1795511926674.jpg';
+const CASE_IMAGES = [
+  '/src/assets/images/case_aerospace_ops_1795511927919.jpg',
+  '/src/assets/images/case_chemical_plant_1795511928045.jpg',
+  '/src/assets/images/case_kaizen_assembly_1795511928523.jpg',
+];
+
+function ResilientImage({
+  src,
+  alt,
+  className = '',
+  fallbackLabel,
+  loading = 'lazy',
+  fetchPriority,
+  width = 1280,
+  height = 720,
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+  fallbackLabel: string;
+  loading?: 'lazy' | 'eager';
+  fetchPriority?: 'high' | 'low' | 'auto';
+  width?: number;
+  height?: number;
+}) {
+  const [failed, setFailed] = useState(false);
+
+  if (failed) {
+    return (
+      <div
+        role="img"
+        aria-label={alt}
+        className={`bg-gradient-to-br from-slate-900 via-slate-800 to-[#0F172A] flex flex-col items-center justify-center gap-2 p-6 text-slate-300 ${className}`}
+      >
+        <Factory className="w-8 h-8 text-[#D96B43]" />
+        <span className="text-xs font-mono tracking-wide text-slate-400 text-center">{fallbackLabel}</span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      width={width}
+      height={height}
+      loading={loading}
+      decoding="async"
+      fetchPriority={fetchPriority}
+      referrerPolicy="no-referrer"
+      onError={() => setFailed(true)}
+      className={className}
+    />
+  );
 }
 
-export function HomeView({ lang, onChangeLang, onNavigate }: HomeViewProps) {
+interface HomeViewProps {
+  lang: Language;
+  onNavigate: (view: AppView, sectionId?: string, prefillNotes?: string) => void;
+  prefillNotes?: string | null;
+  onConsumedPrefill?: () => void;
+}
+
+export function HomeView({
+  lang,
+  onNavigate,
+  prefillNotes = null,
+  onConsumedPrefill,
+}: HomeViewProps) {
   const t = homeCopy[lang];
 
   // ROI Simulator state
@@ -40,6 +111,17 @@ export function HomeView({ lang, onChangeLang, onNavigate }: HomeViewProps) {
   const [toolFilter, setToolFilter] = useState<ToolCategory>('all');
   const [selectedTool, setSelectedTool] = useState<IndustrialTool | null>(null);
 
+  // Lean Success Stories Modal state
+  const [selectedCaseIdx, setSelectedCaseIdx] = useState<number | null>(null);
+
+  // FAQ accordion state
+  const [openFaqIdx, setOpenFaqIdx] = useState<number | null>(null);
+
+  // Client Testimonials Carousel state
+  const [activeTestimonialIdx, setActiveTestimonialIdx] = useState<number>(0);
+  const [carouselPaused, setCarouselPaused] = useState<boolean>(false);
+  const [carouselHovered, setCarouselHovered] = useState<boolean>(false);
+
   // Founder portrait fallback state
   const [portraitError, setPortraitError] = useState(false);
 
@@ -55,8 +137,24 @@ export function HomeView({ lang, onChangeLang, onNavigate }: HomeViewProps) {
     notes: '',
   });
   const [formError, setFormError] = useState<string>('');
+  const [invalidFields, setInvalidFields] = useState<{
+    name?: boolean;
+    company?: boolean;
+    email?: boolean;
+    phone?: boolean;
+  }>({});
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submittedData, setSubmittedData] = useState<DiagnosticSubmission | null>(null);
+  const [submittedRefId, setSubmittedRefId] = useState<string | null>(null);
   const [copiedSummary, setCopiedSummary] = useState(false);
+  const [transferNotice, setTransferNotice] = useState<string | null>(null);
+
+  const caseModalRef = useRef<HTMLDivElement>(null);
+  const toolModalRef = useRef<HTMLDivElement>(null);
+
+  // Accessible modals: Escape, scroll-lock, focus trap & focus restoration
+  useModalA11y(selectedCaseIdx !== null, caseModalRef, () => setSelectedCaseIdx(null));
+  useModalA11y(selectedTool !== null, toolModalRef, () => setSelectedTool(null));
 
   // Sync select defaults when language changes if untouched
   useEffect(() => {
@@ -68,55 +166,168 @@ export function HomeView({ lang, onChangeLang, onNavigate }: HomeViewProps) {
     }));
   }, [lang]);
 
-  // Close tool modal on Escape
+  // Apply prefilled context handed off from PrinciplesView Radar
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setSelectedTool(null);
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+    if (!prefillNotes) return;
+    setFormState((prev) => ({
+      ...prev,
+      notes: prev.notes.includes(prefillNotes)
+        ? prev.notes
+        : prev.notes
+        ? `${prefillNotes}\n${prev.notes}`
+        : prefillNotes,
+    }));
+    setTransferNotice(
+      lang === 'fr'
+        ? 'Synthèse du Radar de Maturité (1–9) préremplie ci-dessous.'
+        : 'Síntese do Radar de Maturidade (1–9) pré-preenchida abaixo.'
+    );
+    onConsumedPrefill?.();
+  }, [prefillNotes, onConsumedPrefill, lang]);
+
+  // Auto-advance testimonials carousel (respects pause, hover & reduced motion)
+  useEffect(() => {
+    if (carouselPaused || carouselHovered) return;
+    const prefersReduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReduced) return;
+
+    const count = t.testimonials.items.length;
+    const timer = window.setInterval(() => {
+      setActiveTestimonialIdx((prev) => (prev + 1) % count);
+    }, 7000);
+    return () => window.clearInterval(timer);
+  }, [carouselPaused, carouselHovered, t.testimonials.items.length]);
 
   const filteredTools =
     toolFilter === 'all'
       ? industrialTools
       : industrialTools.filter((item) => item.category === toolFilter);
 
+  const numberLocale = lang === 'fr' ? 'fr-FR' : 'pt-PT';
+
   const handleTransferRoiToForm = () => {
+    const formatted = quarterSavings.toLocaleString(numberLocale);
     const prefix =
       lang === 'fr'
-        ? `[Simulation ROI : ${operators} opérateurs | Potentiel estimé : ${quarterSavings.toLocaleString('fr-FR')} € / 90j] `
-        : `[Simulação ROI: ${operators} operadores | Potencial estimado: ${quarterSavings.toLocaleString('fr-FR')} € / 90d] `;
+        ? `[Simulation ROI : ${operators} opérateurs | Potentiel estimé : ${formatted} € / 90j] `
+        : `[Simulação ROI: ${operators} operadores | Potencial estimado: ${formatted} € / 90d] `;
     setFormState((prev) => ({
       ...prev,
       notes: prev.notes.startsWith('[Simul') ? prev.notes : `${prefix}${prev.notes}`,
     }));
+    setTransferNotice(
+      lang === 'fr'
+        ? `Simulation ROI (${formatted} € / 90j) jointe aux notes de votre demande.`
+        : `Simulação ROI (${formatted} € / 90d) anexada às notas do seu pedido.`
+    );
     const el = document.getElementById('diagnostico');
     el?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const handleFormSubmit = (e: FormEvent) => {
+  const handleTransferCaseToForm = (sector: string, title: string) => {
+    const prefix =
+      lang === 'fr'
+        ? `[Étude de cas : ${sector} — ${title}] `
+        : `[Estudo de caso: ${sector} — ${title}] `;
+    setSelectedCaseIdx(null);
+    setFormState((prev) => ({
+      ...prev,
+      notes: prev.notes.startsWith('[Étude') || prev.notes.startsWith('[Estudo') ? prev.notes : `${prefix}${prev.notes}`,
+    }));
+    setTransferNotice(
+      lang === 'fr'
+        ? `Référence « ${sector} — ${title} » ajoutée à votre demande.`
+        : `Referência "${sector} — ${title}" adicionada ao seu pedido.`
+    );
+    const el = document.getElementById('diagnostico');
+    el?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handlePrintRoi = () => {
+    document.body.classList.add('roi-print-mode');
+    const cleanup = () => {
+      document.body.classList.remove('roi-print-mode');
+      window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+    window.print();
+    window.setTimeout(cleanup, 1200);
+  };
+
+  const handleFormSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setFormError('');
+    setInvalidFields({});
 
     const name = formState.name.trim();
     const company = formState.company.trim();
     const email = formState.email.trim();
     const phone = formState.phone.trim();
+    const notes = formState.notes.trim();
 
     if (!name || !company || !email || !phone) {
+      setInvalidFields({
+        name: !name,
+        company: !company,
+        email: !email,
+        phone: !phone,
+      });
       setFormError(t.form.errRequired);
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
+      setInvalidFields({ email: true });
       setFormError(t.form.errEmail);
       return;
     }
 
-    setSubmittedData({ ...formState, name, company, email, phone, notes: formState.notes.trim() });
-    setCopiedSummary(false);
+    const payload: DiagnosticSubmission = {
+      ...formState,
+      name,
+      company,
+      email,
+      phone,
+      notes,
+    };
+
+    setIsSubmitting(true);
+    try {
+      const response = await fetch('/api/diagnostic', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...payload, lang }),
+      });
+
+      if (response.ok) {
+        const result = (await response.json()) as { referenceId?: string };
+        setSubmittedRefId(result.referenceId ?? null);
+        setSubmittedData(payload);
+        setCopiedSummary(false);
+        return;
+      }
+
+      if (response.status === 400) {
+        const errBody = (await response.json().catch(() => ({}))) as { error?: string };
+        setFormError(errBody.error === 'INVALID_EMAIL' ? t.form.errEmail : t.form.errRequired);
+        return;
+      }
+
+      // Server unreachable / unexpected 5xx: fall back cleanly to instant WhatsApp/Mail summary
+      setSubmittedRefId(null);
+      setSubmittedData(payload);
+      setCopiedSummary(false);
+    } catch {
+      setSubmittedRefId(null);
+      setSubmittedData(payload);
+      setCopiedSummary(false);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const buildSummaryText = (data: DiagnosticSubmission) => {
@@ -154,31 +365,7 @@ export function HomeView({ lang, onChangeLang, onNavigate }: HomeViewProps) {
     <div id="top">
       {/* 1. HERO SECTION */}
       <section className="bg-[#F8F9FA] border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-16 lg:pb-24">
-          {/* Sub-header Utility Line: Language Switcher + Regional Presence */}
-          <div className="flex flex-wrap items-center justify-between gap-4 pb-8 border-b border-slate-200/80 mb-10 lg:mb-14">
-            <p className="text-xs sm:text-sm font-medium text-slate-600">{t.hero.regionLine}</p>
-            <div className="inline-flex items-center p-1 rounded-lg bg-slate-200/70 border border-slate-300/60" role="group" aria-label="Language selector">
-              <button
-                type="button"
-                onClick={() => onChangeLang('pt')}
-                className={`px-3 py-1 text-xs font-mono font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap ${
-                  lang === 'pt' ? 'bg-white text-slate-950 shadow-xs' : 'text-slate-600 hover:text-slate-950'
-                }`}
-              >
-                PT-PT
-              </button>
-              <button
-                type="button"
-                onClick={() => onChangeLang('fr')}
-                className={`px-3 py-1 text-xs font-mono font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap ${
-                  lang === 'fr' ? 'bg-white text-slate-950 shadow-xs' : 'text-slate-600 hover:text-slate-950'
-                }`}
-              >
-                FR
-              </button>
-            </div>
-          </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 lg:pt-14 pb-16 lg:pb-24">
 
           <div className="grid lg:grid-cols-12 gap-10 lg:gap-12 items-stretch">
             <div className="lg:col-span-7 flex flex-col justify-between space-y-8">
@@ -222,30 +409,45 @@ export function HomeView({ lang, onChangeLang, onNavigate }: HomeViewProps) {
               </div>
             </div>
 
-            {/* Right Commitment Surface */}
-            <div className="lg:col-span-5 bg-[#0F172A] text-white rounded-2xl border border-slate-800 p-6 sm:p-8 flex flex-col justify-between">
-              <div className="flex items-start justify-between gap-4 pb-5 border-b border-slate-800">
-                <div>
-                  <p className="text-xs font-semibold text-[#D96B43] uppercase tracking-wider">
-                    {t.hero.panelTitle}
-                  </p>
-                  <p className="font-display font-bold text-lg text-white mt-1">
-                    {t.hero.panelSubtitle}
-                  </p>
+            {/* Right Commitment Surface with Editorial Factory Visual */}
+            <div className="lg:col-span-5 bg-[#0F172A] text-white rounded-2xl border border-slate-800 overflow-hidden flex flex-col justify-between">
+              <div className="relative aspect-video w-full overflow-hidden bg-slate-900">
+                <ResilientImage
+                  src={HERO_GEMBA_IMAGE}
+                  alt={
+                    lang === 'fr'
+                      ? 'Accompagnement Gemba sur site industriel moderne'
+                      : 'Acompanhamento Gemba em unidade industrial moderna'
+                  }
+                  fallbackLabel="OpEx Lean · Gemba"
+                  loading="eager"
+                  fetchPriority="high"
+                  className="w-full h-full object-cover object-center"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A] via-[#0F172A]/45 to-transparent" />
+                <div className="absolute bottom-3 left-6 right-6 flex items-end justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-mono font-semibold text-[#D96B43] uppercase tracking-wider">
+                      {t.hero.panelTitle}
+                    </p>
+                    <p className="font-display font-bold text-base sm:text-lg text-white leading-snug">
+                      {t.hero.panelSubtitle}
+                    </p>
+                  </div>
+                  <span className="font-mono text-xs font-bold text-emerald-400 tabular-nums whitespace-nowrap shrink-0">
+                    {t.hero.panelTag}
+                  </span>
                 </div>
-                <span className="font-mono text-xs font-bold text-emerald-400 tabular-nums whitespace-nowrap">
-                  {t.hero.panelTag}
-                </span>
               </div>
 
-              <div className="divide-y divide-slate-800 my-2">
+              <div className="p-6 sm:px-8 sm:pb-7 sm:pt-3 divide-y divide-slate-800">
                 {t.hero.metrics.map((m) => (
-                  <div key={m.label} className="py-4 flex items-start gap-4">
+                  <div key={m.label} className="py-3.5 first:pt-2 last:pb-0 flex items-start gap-4">
                     <span className="font-mono font-bold text-xl text-[#D96B43] tabular-nums w-14 shrink-0">
                       {m.value}
                     </span>
                     <div>
-                      <h2 className="font-semibold text-sm text-white">{m.label}</h2>
+                      <h3 className="font-semibold text-sm text-white">{m.label}</h3>
                       <p className="text-xs text-slate-300 leading-relaxed mt-0.5">{m.desc}</p>
                     </div>
                   </div>
@@ -341,6 +543,52 @@ export function HomeView({ lang, onChangeLang, onNavigate }: HomeViewProps) {
                 </div>
               ))}
             </div>
+
+            {/* Field Visual Management Spotlight */}
+            <div className="mt-10 bg-white rounded-2xl border border-slate-200 overflow-hidden grid lg:grid-cols-12 items-stretch">
+              <div className="lg:col-span-7 aspect-video lg:aspect-auto lg:min-h-[300px] bg-slate-900 overflow-hidden">
+                <ResilientImage
+                  src={GEMBA_BOARD_IMAGE}
+                  alt={
+                    lang === 'fr'
+                      ? 'Tableau de management visuel SQCDP au cœur de l’atelier'
+                      : 'Quadro de gestão visual SQCDP no chão de fábrica'
+                  }
+                  fallbackLabel="SQCDP · Gemba Management"
+                  className="w-full h-full object-cover object-center"
+                />
+              </div>
+              <div className="lg:col-span-5 p-8 sm:p-10 flex flex-col justify-between space-y-6">
+                <div className="space-y-3">
+                  <p className="text-xs font-mono font-semibold uppercase tracking-wider text-[#D96B43]">
+                    {lang === 'fr' ? 'Pilotage Visuel · Gemba' : 'Gestão Visual · Terreno'}
+                  </p>
+                  <h3 className="font-display font-extrabold text-2xl text-slate-950 text-balance">
+                    {lang === 'fr'
+                      ? 'Rituels SQCDP quotidiens et autonomie des équipes'
+                      : 'Rituais SQCDP diários e autonomia das equipas'}
+                  </h3>
+                  <p className="text-sm text-slate-600 leading-relaxed">
+                    {lang === 'fr'
+                      ? 'Chaque poste dispose d’indicateurs visuels clairs (Sécurité, Qualité, Coût, Délai, Personnel) pour détecter les écarts en moins de 15 minutes et agir à la source.'
+                      : 'Cada célula opera com indicadores visuais claros (Segurança, Qualidade, Custo, Prazo, Pessoas) para detetar desvios em minutos e eliminar causas raiz no terreno.'}
+                  </p>
+                </div>
+                <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-4">
+                  <span className="text-xs font-mono text-slate-500">
+                    {lang === 'fr' ? '9 Principes · Évaluation 1–9' : '9 Princípios · Avaliação 1–9'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('principles')}
+                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#D96B43] hover:text-[#B8532D] transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    <span>{lang === 'fr' ? 'Lancer l’autodiagnostic' : 'Iniciar autodiagnóstico'}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* 90-Day Roadmap */}
@@ -412,6 +660,10 @@ export function HomeView({ lang, onChangeLang, onNavigate }: HomeViewProps) {
                       <img
                         src="/assets/aistudio/armandino_3d0f8cc6.png"
                         alt="Armandino Seixas"
+                        width={96}
+                        height={112}
+                        loading="lazy"
+                        decoding="async"
                         referrerPolicy="no-referrer"
                         onError={() => setPortraitError(true)}
                         className="w-full h-full object-cover"
@@ -489,63 +741,254 @@ export function HomeView({ lang, onChangeLang, onNavigate }: HomeViewProps) {
             </div>
           </div>
 
-          {/* Real Case Studies (Adjacent Proof) */}
-          <div>
+          {/* Lean Success Stories / Real Case Studies (Adjacent Proof) */}
+          <div id="casos" className="scroll-mt-20">
             <div className="max-w-3xl mb-10">
               <p className="text-xs font-semibold uppercase tracking-wider text-[#D96B43]">{t.cases.kicker}</p>
               <h2 className="font-display font-extrabold text-3xl text-slate-950 mt-2">{t.cases.title}</h2>
+              <p className="text-sm sm:text-base text-slate-600 mt-2 leading-relaxed">{t.cases.subtitle}</p>
             </div>
             <div className="grid md:grid-cols-3 gap-6">
-              {t.cases.items.map((c) => (
-                <article key={c.title} className="bg-[#F8F9FA] rounded-2xl border border-slate-200 p-7 flex flex-col justify-between">
+              {t.cases.items.map((c, idx) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setSelectedCaseIdx(idx)}
+                  className="text-left bg-[#F8F9FA] rounded-2xl border border-slate-200 hover:border-[#D96B43] overflow-hidden flex flex-col justify-between group cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D96B43]"
+                >
                   <div>
-                    <div className="flex items-center gap-2 text-xs font-mono text-slate-500 mb-3">
-                      <span className="font-semibold text-[#D96B43]">{c.sector}</span>
-                      <span aria-hidden="true">·</span>
-                      <span>{c.meta}</span>
+                    <div className="aspect-[4/3] w-full overflow-hidden bg-slate-900">
+                      <ResilientImage
+                        src={CASE_IMAGES[idx % CASE_IMAGES.length]}
+                        alt={`${c.sector} — ${c.title}`}
+                        fallbackLabel={c.sector}
+                        width={800}
+                        height={600}
+                        className="w-full h-full object-cover object-center group-hover:scale-[1.03] transition-transform duration-300"
+                      />
                     </div>
-                    <h3 className="font-display font-bold text-lg text-slate-950 mb-2">{c.title}</h3>
-                    <p className="text-sm text-slate-600 leading-relaxed">{c.desc}</p>
-                  </div>
-                  <div className="mt-6 pt-4 border-t border-slate-200 flex items-baseline justify-between">
-                    <div>
-                      <span className="font-mono font-extrabold text-2xl text-slate-950 tabular-nums">{c.metric}</span>
-                      <span className="block text-xs text-slate-500 mt-0.5">{c.metricLabel}</span>
+                    <div className="p-7 pb-0">
+                      <div className="flex items-center gap-2 text-xs font-mono text-slate-500 mb-3">
+                        <span className="font-semibold text-[#D96B43]">{c.sector}</span>
+                        <span aria-hidden="true">·</span>
+                        <span>{c.meta}</span>
+                      </div>
+                      <h3 className="font-display font-bold text-lg text-slate-950 group-hover:text-[#D96B43] transition-colors mb-2">
+                        {c.title}
+                      </h3>
+                      <p className="text-sm text-slate-600 leading-relaxed">{c.desc}</p>
                     </div>
-                    <span className="text-xs font-mono text-slate-600">{c.method}</span>
                   </div>
-                </article>
+                  <div className="p-7 pt-5 w-full">
+                    <div className="pt-4 border-t border-slate-200 flex items-baseline justify-between">
+                      <div>
+                        <span className="font-mono font-extrabold text-2xl text-slate-950 tabular-nums">{c.metric}</span>
+                        <span className="block text-xs text-slate-500 mt-0.5">{c.metricLabel}</span>
+                      </div>
+                      <span className="text-xs font-mono text-slate-600">{c.method}</span>
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-slate-200/80 flex items-center justify-between text-xs font-semibold text-slate-900 group-hover:text-[#D96B43] transition-colors">
+                      <span>{t.cases.cardAction}</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </div>
+                  </div>
+                </button>
               ))}
             </div>
           </div>
 
-          {/* Attributable Recommendations */}
-          <div>
-            <div className="max-w-3xl mb-10">
-              <p className="text-xs font-semibold uppercase tracking-wider text-[#D96B43]">{t.testimonials.kicker}</p>
-              <h2 className="font-display font-extrabold text-3xl text-slate-950 mt-2">{t.testimonials.title}</h2>
-            </div>
-            <div className="grid md:grid-cols-3 gap-6">
-              {t.testimonials.items.map((rec) => (
-                <blockquote
-                  key={rec.author}
-                  className="bg-white rounded-2xl border border-slate-200 p-7 flex flex-col justify-between"
+          {/* Client Testimonials Carousel (Attributable Executive Proof) */}
+          <div
+            id="depoimentos"
+            className="scroll-mt-20 space-y-8"
+            role="region"
+            aria-roledescription="carousel"
+            aria-label={t.testimonials.title}
+            onMouseEnter={() => setCarouselHovered(true)}
+            onMouseLeave={() => setCarouselHovered(false)}
+            onKeyDown={(e) => {
+              const count = t.testimonials.items.length;
+              if (e.key === 'ArrowLeft') {
+                setActiveTestimonialIdx((prev) => (prev - 1 + count) % count);
+              } else if (e.key === 'ArrowRight') {
+                setActiveTestimonialIdx((prev) => (prev + 1) % count);
+              }
+            }}
+          >
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+              <div className="max-w-3xl">
+                <p className="text-xs font-semibold uppercase tracking-wider text-[#D96B43]">
+                  {t.testimonials.kicker}
+                </p>
+                <h2 className="font-display font-extrabold text-3xl text-slate-950 mt-2">
+                  {t.testimonials.title}
+                </h2>
+                <p className="text-sm sm:text-base text-slate-600 mt-2 leading-relaxed">
+                  {t.testimonials.subtitle}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="font-mono text-xs font-semibold text-slate-500 tabular-nums mr-1">
+                  0{activeTestimonialIdx + 1} / 0{t.testimonials.items.length}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCarouselPaused((prev) => !prev)}
+                  aria-label={carouselPaused ? t.testimonials.playLabel : t.testimonials.pauseLabel}
+                  title={carouselPaused ? t.testimonials.playLabel : t.testimonials.pauseLabel}
+                  className="w-10 h-10 rounded-lg border border-slate-200 bg-white hover:border-slate-300 text-slate-700 hover:text-slate-950 flex items-center justify-center transition-colors cursor-pointer"
                 >
-                  <p className="text-sm text-slate-700 leading-relaxed italic mb-6">{rec.quote}</p>
-                  <footer className="flex items-center gap-3 pt-4 border-t border-slate-100">
-                    <div className="w-9 h-9 rounded-full bg-[#0F172A] text-white font-mono text-xs font-bold flex items-center justify-center shrink-0">
-                      {rec.initials}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm text-slate-950">{rec.author}</p>
-                      <p className="text-xs text-slate-500">
-                        {rec.role} · {rec.org}
-                      </p>
-                    </div>
-                  </footer>
-                </blockquote>
-              ))}
+                  {carouselPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setActiveTestimonialIdx(
+                      (prev) => (prev - 1 + t.testimonials.items.length) % t.testimonials.items.length
+                    )
+                  }
+                  aria-label={t.testimonials.prevLabel}
+                  title={t.testimonials.prevLabel}
+                  className="w-10 h-10 rounded-lg border border-slate-200 bg-white hover:border-[#D96B43] text-slate-800 hover:text-[#D96B43] flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setActiveTestimonialIdx((prev) => (prev + 1) % t.testimonials.items.length)
+                  }
+                  aria-label={t.testimonials.nextLabel}
+                  title={t.testimonials.nextLabel}
+                  className="w-10 h-10 rounded-lg border border-slate-200 bg-[#0F172A] hover:bg-[#D96B43] text-white flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
+
+            {(() => {
+              const activeRec =
+                t.testimonials.items[activeTestimonialIdx] || t.testimonials.items[0];
+              return (
+                <div className="space-y-4">
+                  {/* Main Spotlight Slide */}
+                  <div
+                    id={`testimonial-panel-${activeTestimonialIdx}`}
+                    role="tabpanel"
+                    aria-live="polite"
+                    className="bg-[#0F172A] text-white rounded-2xl border border-slate-800 p-8 sm:p-10 lg:p-12 flex flex-col justify-between gap-8"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
+                        <span className="text-[#D96B43] font-semibold">{activeRec.sector}</span>
+                        <span aria-hidden="true">·</span>
+                        <span>{activeRec.focus}</span>
+                      </div>
+                      <span className="text-xs font-mono text-emerald-400">
+                        {t.testimonials.verifiedLabel}
+                      </span>
+                    </div>
+
+                    <div className="flex items-start gap-4 sm:gap-6">
+                      <Quote
+                        aria-hidden="true"
+                        className="w-8 h-8 sm:w-10 sm:h-10 text-[#D96B43] shrink-0 mt-1"
+                      />
+                      <blockquote className="font-display font-semibold text-lg sm:text-xl lg:text-2xl text-white leading-relaxed text-balance">
+                        {activeRec.quote}
+                      </blockquote>
+                    </div>
+
+                    <div className="pt-6 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-[#D96B43] text-white font-mono text-sm font-bold flex items-center justify-center shrink-0">
+                          {activeRec.initials}
+                        </div>
+                        <div>
+                          <p className="font-display font-bold text-base sm:text-lg text-white">
+                            {activeRec.author}
+                          </p>
+                          <p className="text-xs sm:text-sm text-slate-300">
+                            {activeRec.role} · <span className="font-semibold text-white">{activeRec.org}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <div
+                        className="flex items-center gap-2"
+                        role="tablist"
+                        aria-label={t.testimonials.title}
+                        onKeyDown={(e) => {
+                          const count = t.testimonials.items.length;
+                          if (e.key === 'ArrowRight') {
+                            e.stopPropagation();
+                            setActiveTestimonialIdx((prev) => (prev + 1) % count);
+                          } else if (e.key === 'ArrowLeft') {
+                            e.stopPropagation();
+                            setActiveTestimonialIdx((prev) => (prev - 1 + count) % count);
+                          }
+                        }}
+                      >
+                        {t.testimonials.items.map((item, idx) => (
+                          <button
+                            key={item.author}
+                            type="button"
+                            role="tab"
+                            aria-selected={activeTestimonialIdx === idx}
+                            aria-controls={`testimonial-panel-${idx}`}
+                            aria-label={`${item.author} — ${item.org}`}
+                            onClick={() => setActiveTestimonialIdx(idx)}
+                            className={`h-2 rounded-full transition-all cursor-pointer ${
+                              activeTestimonialIdx === idx
+                                ? 'w-8 bg-[#D96B43]'
+                                : 'w-2 bg-slate-600 hover:bg-slate-400'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quick Executive Selector Strip */}
+                  <div className="grid md:grid-cols-3 gap-4">
+                    {t.testimonials.items.map((rec, idx) => {
+                      const isActive = activeTestimonialIdx === idx;
+                      return (
+                        <button
+                          key={rec.author}
+                          type="button"
+                          aria-current={isActive ? 'true' : undefined}
+                          onClick={() => setActiveTestimonialIdx(idx)}
+                          className={`text-left rounded-xl p-5 border transition-colors flex items-center gap-3.5 cursor-pointer ${
+                            isActive
+                              ? 'bg-white border-[#D96B43]'
+                              : 'bg-[#F8F9FA] border-slate-200 hover:border-slate-300'
+                          }`}
+                        >
+                          <div
+                            className={`w-10 h-10 rounded-full font-mono text-xs font-bold flex items-center justify-center shrink-0 transition-colors ${
+                              isActive
+                                ? 'bg-[#D96B43] text-white'
+                                : 'bg-[#0F172A] text-white'
+                            }`}
+                          >
+                            {rec.initials}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-sm text-slate-950 truncate">{rec.author}</p>
+                            <p className="text-xs text-slate-500 truncate">
+                              {rec.role} · {rec.org}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       </section>
@@ -553,6 +996,20 @@ export function HomeView({ lang, onChangeLang, onNavigate }: HomeViewProps) {
       {/* 5. INTERACTIVE ROI SIMULATOR */}
       <section id="simulador" className="py-20 lg:py-24 bg-[#0F172A] text-white scroll-mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Executive Print-Only Letterhead */}
+          <div className="hidden print:flex items-center justify-between border-b border-slate-300 pb-4 mb-6">
+            <div>
+              <p className="font-mono text-xs font-bold uppercase tracking-wider">OPEX LEAN · ARMANDINO SEIXAS</p>
+              <p className="font-display font-extrabold text-xl">
+                {lang === 'fr' ? 'Simulation Exécutive ROI — 90 Jours' : 'Simulação Executiva ROI — 90 Dias'}
+              </p>
+            </div>
+            <div className="text-right font-mono text-xs">
+              <p>https://opex-lean.eu</p>
+              <p>{new Date().toISOString().slice(0, 10)}</p>
+            </div>
+          </div>
+
           <div className="grid lg:grid-cols-12 gap-10 items-center">
             <div className="lg:col-span-6 space-y-6">
               <p className="text-xs font-semibold uppercase tracking-wider text-[#D96B43]">{t.simulator.kicker}</p>
@@ -631,27 +1088,32 @@ export function HomeView({ lang, onChangeLang, onNavigate }: HomeViewProps) {
                   <div className="bg-[#0F172A] border border-slate-800 rounded-xl p-5">
                     <p className="text-xs text-slate-400 uppercase font-medium">{t.simulator.resHours}</p>
                     <p className="font-mono font-extrabold text-3xl text-white mt-2 tabular-nums">
-                      {recoveredHours.toLocaleString('fr-FR')}{' '}
+                      {recoveredHours.toLocaleString(numberLocale)}{' '}
                       <span className="text-sm font-normal text-slate-400">{t.simulator.resHoursUnit}</span>
                     </p>
                   </div>
                   <div className="bg-[#0F172A] border border-[#D96B43]/50 rounded-xl p-5">
                     <p className="text-xs text-[#D96B43] uppercase font-medium">{t.simulator.resSavings}</p>
                     <p className="font-mono font-extrabold text-3xl text-emerald-400 mt-2 tabular-nums">
-                      {quarterSavings.toLocaleString('fr-FR')} €
+                      {quarterSavings.toLocaleString(numberLocale)} €
                     </p>
                   </div>
                 </div>
 
-                <div className="bg-[#0F172A] border border-slate-800 rounded-xl p-5">
+                <div className="bg-[#0F172A] border border-slate-800 rounded-xl p-5 space-y-2">
                   <p className="text-xs text-slate-300">{t.simulator.resAnnualLabel}</p>
-                  <p className="font-mono font-bold text-2xl text-white mt-1 tabular-nums">
-                    {annualSavings.toLocaleString('fr-FR')} €{' '}
+                  <p className="font-mono font-bold text-2xl text-white tabular-nums">
+                    {annualSavings.toLocaleString(numberLocale)} €{' '}
                     <span className="text-xs font-sans font-normal text-slate-400">{t.simulator.resAnnualSub}</span>
+                  </p>
+                  <p className="text-[11px] font-mono text-slate-400 pt-2 border-t border-slate-800 tabular-nums">
+                    {lang === 'fr'
+                      ? `Hypothèse : ${operators} op. × 520 h/trim. × ${Math.round(sectorWaste * 100)}% Muda × 50% captation × ${hourlyCost} €/h`
+                      : `Base de cálculo: ${operators} op. × 520 h/trim. × ${Math.round(sectorWaste * 100)}% Muda × 50% captação × ${hourlyCost} €/h`}
                   </p>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex flex-col sm:flex-row gap-3 no-print">
                   <button
                     type="button"
                     onClick={handleTransferRoiToForm}
@@ -661,7 +1123,7 @@ export function HomeView({ lang, onChangeLang, onNavigate }: HomeViewProps) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => window.print()}
+                    onClick={handlePrintRoi}
                     className="px-4 py-3.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
                   >
                     <Printer className="w-4 h-4" />
@@ -733,6 +1195,161 @@ export function HomeView({ lang, onChangeLang, onNavigate }: HomeViewProps) {
         </div>
       </section>
 
+      {/* Lean Success Story Deep-Dive Modal */}
+      {selectedCaseIdx !== null && t.cases.items[selectedCaseIdx] && (() => {
+        const activeCase = t.cases.items[selectedCaseIdx];
+        const totalCases = t.cases.items.length;
+        return (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="case-study-modal-title"
+            onClick={() => setSelectedCaseIdx(null)}
+            className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4"
+          >
+            <div
+              ref={caseModalRef}
+              tabIndex={-1}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl max-w-3xl w-full max-h-[92vh] overflow-y-auto border border-slate-200 shadow-2xl focus:outline-none"
+            >
+              {/* Banner Photo with Measured Scrim */}
+              <div className="relative h-52 sm:h-60 w-full overflow-hidden bg-slate-900">
+                <ResilientImage
+                  src={CASE_IMAGES[selectedCaseIdx % CASE_IMAGES.length]}
+                  alt={`${activeCase.sector} — ${activeCase.title}`}
+                  fallbackLabel={activeCase.sector}
+                  className="w-full h-full object-cover object-center"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A] via-[#0F172A]/55 to-black/20" />
+                <button
+                  type="button"
+                  onClick={() => setSelectedCaseIdx(null)}
+                  aria-label={lang === 'fr' ? 'Fermer' : 'Fechar'}
+                  className="absolute top-4 right-4 p-2 rounded-lg bg-slate-950/70 hover:bg-slate-950 text-white border border-white/20 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+                <div className="absolute bottom-5 left-6 right-6 text-white">
+                  <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-slate-300 mb-1.5">
+                    <span className="font-semibold text-[#D96B43]">{activeCase.sector}</span>
+                    <span aria-hidden="true">·</span>
+                    <span>{activeCase.meta}</span>
+                    <span aria-hidden="true">·</span>
+                    <span>{activeCase.method}</span>
+                  </div>
+                  <h3 id="case-study-modal-title" className="font-display font-extrabold text-2xl sm:text-3xl text-white">
+                    {activeCase.title}
+                  </h3>
+                </div>
+              </div>
+
+              <div className="p-6 sm:p-8 space-y-7">
+                {/* Industrial Context Metadata Grid */}
+                <div className="grid sm:grid-cols-12 gap-4 pb-6 border-b border-slate-200">
+                  <div className="sm:col-span-6">
+                    <p className="text-xs font-mono font-semibold uppercase tracking-wider text-slate-500">
+                      {t.cases.modalContextLabel}
+                    </p>
+                    <p className="text-sm text-slate-700 leading-relaxed mt-1">{activeCase.context}</p>
+                  </div>
+                  <div className="sm:col-span-3">
+                    <p className="text-xs font-mono font-semibold uppercase tracking-wider text-slate-500">
+                      {t.cases.modalDurationLabel}
+                    </p>
+                    <p className="font-mono font-bold text-base text-slate-950 mt-1 tabular-nums">{activeCase.duration}</p>
+                  </div>
+                  <div className="sm:col-span-3">
+                    <p className="text-xs font-mono font-semibold uppercase tracking-wider text-slate-500">
+                      {t.cases.modalScopeLabel}
+                    </p>
+                    <p className="text-sm font-semibold text-slate-950 mt-1">{activeCase.teamScope}</p>
+                  </div>
+                </div>
+
+                {/* Quantified KPI Impact Row */}
+                <div>
+                  <p className="text-xs font-mono font-semibold uppercase tracking-wider text-[#D96B43] mb-3">
+                    {t.cases.modalResultsTitle}
+                  </p>
+                  <div className="grid sm:grid-cols-3 gap-4">
+                    {activeCase.kpis.map((k) => (
+                      <div key={k.label} className="bg-[#0F172A] text-white rounded-xl p-4 border border-slate-800">
+                        <p className="font-mono font-extrabold text-2xl text-emerald-400 tabular-nums">{k.value}</p>
+                        <p className="text-xs font-semibold text-white mt-1">{k.label}</p>
+                        <p className="text-xs font-mono text-slate-400 mt-0.5 tabular-nums">{k.delta}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Before vs Gemba Intervention Comparison */}
+                <div className="grid sm:grid-cols-2 gap-6">
+                  <div className="bg-[#F8F9FA] rounded-xl p-5 border border-slate-200 space-y-3">
+                    <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-700">
+                      {t.cases.modalBeforeTitle}
+                    </h4>
+                    <ul className="space-y-2.5 text-sm text-slate-600">
+                      {activeCase.beforeItems.map((item) => (
+                        <li key={item} className="flex items-start gap-2.5">
+                          <X className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="bg-white rounded-xl p-5 border border-slate-200 space-y-3">
+                    <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-[#D96B43]">
+                      {t.cases.modalActionsTitle}
+                    </h4>
+                    <ul className="space-y-2.5 text-sm text-slate-700">
+                      {activeCase.interventionItems.map((item) => (
+                        <li key={item} className="flex items-start gap-2.5">
+                          <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Modal Stepper & Primary CTA */}
+                <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCaseIdx((selectedCaseIdx - 1 + totalCases) % totalCases)}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                      <span>{t.cases.modalPrev}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCaseIdx((selectedCaseIdx + 1) % totalCases)}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap"
+                    >
+                      <span>{t.cases.modalNext}</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleTransferCaseToForm(activeCase.sector, activeCase.title)}
+                    className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-lg bg-[#D96B43] hover:bg-[#B8532D] text-white text-sm font-semibold transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    <span>{t.cases.modalCta}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Tool Detail Modal */}
       {selectedTool && (
         <div
@@ -743,8 +1360,10 @@ export function HomeView({ lang, onChangeLang, onNavigate }: HomeViewProps) {
           className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4"
         >
           <div
+            ref={toolModalRef}
+            tabIndex={-1}
             onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8 border border-slate-200 shadow-2xl space-y-6"
+            className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8 border border-slate-200 shadow-2xl space-y-6 focus:outline-none"
           >
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -760,7 +1379,7 @@ export function HomeView({ lang, onChangeLang, onNavigate }: HomeViewProps) {
               <button
                 type="button"
                 onClick={() => setSelectedTool(null)}
-                aria-label="Fechar"
+                aria-label={lang === 'fr' ? 'Fermer' : 'Fechar'}
                 className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -810,6 +1429,22 @@ export function HomeView({ lang, onChangeLang, onNavigate }: HomeViewProps) {
 
             {!submittedData ? (
               <form noValidate onSubmit={handleFormSubmit} className="p-6 sm:p-10 space-y-6">
+                {transferNotice && !formError && (
+                  <div
+                    role="status"
+                    className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs sm:text-sm font-medium flex items-center justify-between gap-3"
+                  >
+                    <span>{transferNotice}</span>
+                    <button
+                      type="button"
+                      onClick={() => setTransferNotice(null)}
+                      aria-label={lang === 'fr' ? 'Fermer' : 'Fechar'}
+                      className="text-emerald-700 hover:text-emerald-950 cursor-pointer shrink-0"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
                 {formError && (
                   <div role="alert" className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 text-sm font-medium">
                     {formError}
@@ -824,11 +1459,18 @@ export function HomeView({ lang, onChangeLang, onNavigate }: HomeViewProps) {
                     <input
                       id="f-name"
                       type="text"
+                      autoComplete="name"
                       required
+                      aria-invalid={Boolean(invalidFields.name)}
                       value={formState.name}
-                      onChange={(e) => setFormState({ ...formState, name: e.target.value })}
+                      onChange={(e) => {
+                        setFormState({ ...formState, name: e.target.value });
+                        if (invalidFields.name) setInvalidFields((prev) => ({ ...prev, name: false }));
+                      }}
                       placeholder={t.form.namePh}
-                      className="w-full px-4 py-3 rounded-lg border border-slate-300 bg-white text-sm text-slate-900 focus:outline-none focus:border-[#D96B43]"
+                      className={`w-full px-4 py-3 rounded-lg border bg-white text-sm text-slate-900 focus:outline-none focus:border-[#D96B43] ${
+                        invalidFields.name ? 'border-red-500' : 'border-slate-300'
+                      }`}
                     />
                   </div>
                   <div>
@@ -838,11 +1480,18 @@ export function HomeView({ lang, onChangeLang, onNavigate }: HomeViewProps) {
                     <input
                       id="f-company"
                       type="text"
+                      autoComplete="organization"
                       required
+                      aria-invalid={Boolean(invalidFields.company)}
                       value={formState.company}
-                      onChange={(e) => setFormState({ ...formState, company: e.target.value })}
+                      onChange={(e) => {
+                        setFormState({ ...formState, company: e.target.value });
+                        if (invalidFields.company) setInvalidFields((prev) => ({ ...prev, company: false }));
+                      }}
                       placeholder={t.form.companyPh}
-                      className="w-full px-4 py-3 rounded-lg border border-slate-300 bg-white text-sm text-slate-900 focus:outline-none focus:border-[#D96B43]"
+                      className={`w-full px-4 py-3 rounded-lg border bg-white text-sm text-slate-900 focus:outline-none focus:border-[#D96B43] ${
+                        invalidFields.company ? 'border-red-500' : 'border-slate-300'
+                      }`}
                     />
                   </div>
                 </div>
@@ -855,11 +1504,18 @@ export function HomeView({ lang, onChangeLang, onNavigate }: HomeViewProps) {
                     <input
                       id="f-email"
                       type="email"
+                      autoComplete="email"
                       required
+                      aria-invalid={Boolean(invalidFields.email)}
                       value={formState.email}
-                      onChange={(e) => setFormState({ ...formState, email: e.target.value })}
+                      onChange={(e) => {
+                        setFormState({ ...formState, email: e.target.value });
+                        if (invalidFields.email) setInvalidFields((prev) => ({ ...prev, email: false }));
+                      }}
                       placeholder={t.form.emailPh}
-                      className="w-full px-4 py-3 rounded-lg border border-slate-300 bg-white text-sm text-slate-900 focus:outline-none focus:border-[#D96B43]"
+                      className={`w-full px-4 py-3 rounded-lg border bg-white text-sm text-slate-900 focus:outline-none focus:border-[#D96B43] ${
+                        invalidFields.email ? 'border-red-500' : 'border-slate-300'
+                      }`}
                     />
                   </div>
                   <div>
@@ -869,11 +1525,18 @@ export function HomeView({ lang, onChangeLang, onNavigate }: HomeViewProps) {
                     <input
                       id="f-phone"
                       type="tel"
+                      autoComplete="tel"
                       required
+                      aria-invalid={Boolean(invalidFields.phone)}
                       value={formState.phone}
-                      onChange={(e) => setFormState({ ...formState, phone: e.target.value })}
+                      onChange={(e) => {
+                        setFormState({ ...formState, phone: e.target.value });
+                        if (invalidFields.phone) setInvalidFields((prev) => ({ ...prev, phone: false }));
+                      }}
                       placeholder={t.form.phonePh}
-                      className="w-full px-4 py-3 rounded-lg border border-slate-300 bg-white text-sm text-slate-900 focus:outline-none focus:border-[#D96B43]"
+                      className={`w-full px-4 py-3 rounded-lg border bg-white text-sm text-slate-900 focus:outline-none focus:border-[#D96B43] ${
+                        invalidFields.phone ? 'border-red-500' : 'border-slate-300'
+                      }`}
                     />
                   </div>
                   <div>
@@ -949,9 +1612,10 @@ export function HomeView({ lang, onChangeLang, onNavigate }: HomeViewProps) {
                 <div className="space-y-3">
                   <button
                     type="submit"
-                    className="w-full px-6 py-4 rounded-lg bg-[#D96B43] hover:bg-[#B8532D] text-white font-bold text-base transition-colors cursor-pointer"
+                    disabled={isSubmitting}
+                    className="w-full px-6 py-4 rounded-lg bg-[#D96B43] hover:bg-[#B8532D] disabled:opacity-60 disabled:cursor-wait text-white font-bold text-base transition-colors cursor-pointer"
                   >
-                    {t.form.submit}
+                    {isSubmitting ? t.form.submitting : t.form.submit}
                   </button>
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-slate-500">
                     <span className="inline-flex items-center gap-1.5">
@@ -975,6 +1639,11 @@ export function HomeView({ lang, onChangeLang, onNavigate }: HomeViewProps) {
                 </div>
 
                 <div className="bg-white border border-slate-200 rounded-xl p-5 max-w-md mx-auto text-left text-sm space-y-2 text-slate-800">
+                  {submittedRefId && (
+                    <p className="font-mono text-xs text-[#D96B43] font-bold pb-2 border-b border-slate-100">
+                      {t.form.refLabel}: {submittedRefId}
+                    </p>
+                  )}
                   <p><strong>{t.form.labels.contact}:</strong> {submittedData.name}</p>
                   <p><strong>{t.form.labels.company}:</strong> {submittedData.company}</p>
                   <p><strong>{t.form.labels.email}:</strong> {submittedData.email}</p>
@@ -1016,7 +1685,11 @@ export function HomeView({ lang, onChangeLang, onNavigate }: HomeViewProps) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setSubmittedData(null)}
+                    onClick={() => {
+                      setSubmittedData(null);
+                      setSubmittedRefId(null);
+                      setCopiedSummary(false);
+                    }}
                     className="font-medium text-slate-500 hover:text-slate-900 underline cursor-pointer"
                   >
                     {t.form.confReset}
@@ -1033,12 +1706,39 @@ export function HomeView({ lang, onChangeLang, onNavigate }: HomeViewProps) {
               <h3 className="font-display font-extrabold text-2xl sm:text-3xl text-slate-950 mt-1">{t.faq.title}</h3>
             </div>
             <div className="divide-y divide-slate-200 border-t border-b border-slate-200">
-              {t.faq.items.map((item) => (
-                <div key={item.q} className="py-5">
-                  <h4 className="font-semibold text-base text-slate-950">{item.q}</h4>
-                  <p className="text-sm text-slate-600 mt-2 leading-relaxed">{item.a}</p>
-                </div>
-              ))}
+              {t.faq.items.map((item, idx) => {
+                const isOpen = openFaqIdx === idx;
+                const answerId = `faq-answer-${idx}`;
+                return (
+                  <div key={item.q} className="py-1">
+                    <button
+                      type="button"
+                      onClick={() => setOpenFaqIdx(isOpen ? null : idx)}
+                      aria-expanded={isOpen}
+                      aria-controls={answerId}
+                      className="w-full py-4 flex items-center justify-between gap-4 text-left group cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D96B43]"
+                    >
+                      <h4
+                        className={`font-semibold text-base transition-colors ${
+                          isOpen ? 'text-[#D96B43]' : 'text-slate-950 group-hover:text-[#D96B43]'
+                        }`}
+                      >
+                        {item.q}
+                      </h4>
+                      <ChevronDown
+                        className={`w-5 h-5 shrink-0 transition-transform duration-200 ${
+                          isOpen ? 'rotate-180 text-[#D96B43]' : 'text-slate-400 group-hover:text-slate-700'
+                        }`}
+                      />
+                    </button>
+                    {isOpen && (
+                      <div id={answerId} className="pb-5 pr-8">
+                        <p className="text-sm text-slate-600 leading-relaxed">{item.a}</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
