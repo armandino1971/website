@@ -1,0 +1,39 @@
+# OpEx Lean Solutions (opex-lean.eu)
+
+> Field-first Operational Excellence, Lean Transformation, and Interim Management consultancy operating across France and Portugal. Founded by Armandino Seixas, Senior Business Transformation Advisor with 25+ years of executive and shop-floor leadership ("0 slide, 100% terrain").
+
+OpEx Lean Solutions helps industrial SMEs, mid-caps, and service organizations eliminate operational waste, restore P&L margins, and build autonomous daily management routines directly on the shop floor (Gemba). Engagements are structured around a rapid 15-day diagnostic baseline backed by a contractual performance guarantee (50% fee refund if mutually agreed objectives are not met).
+
+## Core Services & Offerings
+
+- [Operational Excellence & Lean Transformation](https://www.opex-lean.eu/): End-to-end deployment of Lean Manufacturing and Lean Services methodologies (VSM, 5S, SMED, TPM, Kanban, Visual Management, Obeya, Hoshin Kanri).
+- [Interim Management & Site Turnaround](https://www.opex-lean.eu/): Hands-on interim Site Director, Operations Director, and turnaround leadership in France and Portugal to stabilize production, recover productivity, and restructure underperforming units.
+- [Active Supervision & Gemba Coaching](https://www.opex-lean.eu/): Coaching plant managers, supervisors, and team leaders to implement short interval control (SIC), daily stand-up rituals, and actionable KPI boards.
+- [15-Day Field Diagnostic](https://www.opex-lean.eu/): Rapid on-site operational and financial baseline audit identifying root causes and quantifying P&L recovery potential, backed by a 50% fee refund commitment on agreed targets.
+
+## Interactive Tools & Knowledge Base
+
+- [Lean Maturity Self-Diagnostic](https://www.opex-lean.eu/): Interactive assessment tool allowing industrial and service leaders to evaluate their operational maturity and identify priority improvement levers.
+- [70 Practical Lean & OpEx Tool Sheets](https://www.opex-lean.eu/): Comprehensive bilingual (French / European Portuguese) field reference library covering Lean tools, root-cause problem solving, flow optimization, and shop-floor management.
+
+## Founder & Track Record
+
+- **Armandino Seixas**: Founder & Senior Business Transformation Advisor (MBA in Lean Services Management, Master in Management from Université Paris-Saclay, Six Sigma Green Belt, Certified Professional Trainer).
+- **Proven Industrial & Commercial Results**:
+  - **Groupe Eureden (France)**: 8-month production and maintenance transformation, establishing daily management rituals and supervisor coaching.
+  - **Aubert & Duval (France)**: +30% workshop performance improvement via flow optimization and management routines.
+  - **Eramet (France)**: +300% production output increase in 6 months.
+  - **Hermès & Action (Europe)**: Hoshin Kanri flow analysis and multi-country retail productivity optimization across 6 European countries.
+  - **Vitarmonyl Portugal (Groupe Ponroy)**: Built and led the Portuguese subsidiary from scratch as Managing Director (Directeur Général) with full P&L responsibility (2010–2017).
+  - **F. Lima S.A. (Portugal)**: Executive Committee (CODIR) member, Purchasing & HR Director, achieving 20% cost reduction on an €8M procurement budget.
+
+## Languages & Geographic Coverage
+
+- **Languages**: French (`fr-FR`), European Portuguese (`pt-PT`), English (`en`).
+- **Markets**: France, Portugal, and Western Europe (on-site interventions and executive advisory).
+
+## Contact & Official Profiles
+
+- **Website**: https://www.opex-lean.eu/
+- **Email**: contact@opex-lean.eu
+- **LinkedIn Company**: https://www.linkedin.com/company/opex-lean
