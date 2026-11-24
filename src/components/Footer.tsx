@@ -23,14 +23,19 @@ export function Footer({ lang, onChangeLang, onNavigate, onOpenCookieBanner }: F
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
           <div className="space-y-4">
             <div className="flex items-center gap-2.5">
-              <img
-                src="/assets/aistudio/logo-opex-lean_d2b62a02.png"
-                alt="OpEx Lean"
-                width={36}
-                height={36}
-                referrerPolicy="no-referrer"
-                className="w-9 h-9 rounded-md object-contain"
-              />
+              <picture>
+                <source srcSet="/assets/aistudio/logo-opex-lean_d2b62a02.webp" type="image/webp" />
+                <img
+                  src="/assets/aistudio/logo-opex-lean_d2b62a02.png"
+                  alt="OpEx Lean"
+                  width={36}
+                  height={36}
+                  loading="lazy"
+                  decoding="async"
+                  referrerPolicy="no-referrer"
+                  className="w-9 h-9 rounded-md object-contain"
+                />
+              </picture>
               <span className="font-display font-extrabold text-xl text-white">
                 OpEx <span className="text-[#D96B43]">Lean</span>
               </span>
@@ -117,8 +122,21 @@ export function Footer({ lang, onChangeLang, onNavigate, onOpenCookieBanner }: F
             <h4 className="text-white font-semibold text-sm mb-4">{f.contactTitle}</h4>
             <ul className="space-y-2.5 text-sm text-slate-400">
               <li>
-                <a href={waUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline font-medium">
-                  WhatsApp: +351 912 771 681
+                <a
+                  href={waUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="WhatsApp: +351 912 771 681"
+                  title="WhatsApp: +351 912 771 681"
+                  className="inline-flex items-center hover:opacity-85 transition-opacity"
+                >
+                  <svg viewBox="0 0 32 32" className="w-6 h-6" aria-hidden="true">
+                    <rect width="32" height="32" rx="6" fill="#25D366" />
+                    <path
+                      fill="#FFFFFF"
+                      d="M16.004 5.2c-5.958 0-10.8 4.842-10.8 10.8 0 1.904.499 3.764 1.446 5.403L5.2 26.8l5.524-1.448a10.75 10.75 0 0 0 5.28 1.38h.005c5.954 0 10.795-4.842 10.795-10.8 0-2.885-1.124-5.597-3.164-7.638A10.73 10.73 0 0 0 16.004 5.2Zm6.291 15.385c-.265.746-1.539 1.426-2.133 1.512-.543.079-1.23.113-1.984-.127-.459-.145-1.046-.34-1.799-.666-3.166-1.367-5.233-4.558-5.392-4.77-.159-.213-1.287-1.713-1.287-3.267 0-1.554.815-2.319 1.104-2.636.29-.315.633-.395.842-.395.21 0 .422.002.606.012.194.01.454-.074.71.542.263.634.896 2.189.976 2.347.079.159.131.343.027.554-.105.212-.159.342-.316.528-.158.184-.332.412-.474.553-.158.159-.324.33-.138.647.184.315.818 1.35 1.758 2.189 1.208 1.076 2.226 1.41 2.541 1.569.316.159.501.132.685-.079.184-.211.792-.923 1.003-1.239.21-.315.422-.263.71-.158.29.106 1.844.871 2.16 1.028.316.158.527.237.606.369.079.132.079.765-.186 1.51Z"
+                    />
+                  </svg>
                 </a>
               </li>
               <li>
@@ -127,8 +145,21 @@ export function Footer({ lang, onChangeLang, onNavigate, onOpenCookieBanner }: F
                 </a>
               </li>
               <li>
-                <a href={LINKEDIN_URL} target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">
-                  LinkedIn — Armandino Seixas
+                <a
+                  href="https://www.linkedin.com/company/110004035/admin/dashboard/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="LinkedIn — OpEx Lean"
+                  title="LinkedIn — OpEx Lean"
+                  className="inline-flex items-center hover:opacity-85 transition-opacity"
+                >
+                  <svg viewBox="0 0 24 24" className="w-6 h-6" aria-hidden="true">
+                    <rect width="24" height="24" rx="4" fill="#0A66C2" />
+                    <path
+                      fill="#FFFFFF"
+                      d="M8.05 18.5H5.35V9.8h2.7v8.7ZM6.7 8.62a1.56 1.56 0 1 1 0-3.12 1.56 1.56 0 0 1 0 3.12ZM19 18.5h-2.7v-4.23c0-1.01-.02-2.31-1.4-2.31-1.41 0-1.62 1.1-1.62 2.24v4.3h-2.7V9.8h2.59v1.19h.04c.36-.68 1.24-1.4 2.55-1.4 2.73 0 3.24 1.8 3.24 4.13v4.78Z"
+                    />
+                  </svg>
                 </a>
               </li>
               <li>Oeiras / Lisboa · Portugal</li>

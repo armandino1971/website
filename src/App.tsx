@@ -63,6 +63,21 @@ function setMetaContent(selector: string, content: string, attr: 'content' | 'hr
   if (el) el.setAttribute(attr, content);
 }
 
+function scrollToSectionStart(sectionId: string) {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const el = document.getElementById(sectionId);
+      if (!el) return;
+      const headerHeight = document.querySelector('header')?.getBoundingClientRect().height ?? 65;
+      const targetTop = el.getBoundingClientRect().top + window.scrollY - headerHeight;
+      window.scrollTo({
+        top: Math.max(0, Math.round(targetTop)),
+        behavior: 'smooth',
+      });
+    });
+  });
+}
+
 export default function App() {
   const [lang, setLang] = useState<Language>(getInitialLanguage);
   const [activeView, setActiveView] = useState<AppView>(getInitialView);
@@ -149,6 +164,14 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+  // Handle initial URL hash navigation on first load
+  useEffect(() => {
+    const initialHash = window.location.hash.replace(/^#/, '');
+    if (initialHash) {
+      pendingSectionRef.current = initialHash;
+    }
+  }, []);
+
   // Scroll to deferred anchor once target view mounts
   useEffect(() => {
     const targetId = pendingSectionRef.current;
@@ -159,7 +182,7 @@ export default function App() {
       const el = document.getElementById(targetId);
       if (el) {
         pendingSectionRef.current = null;
-        el.scrollIntoView({ behavior: 'smooth' });
+        scrollToSectionStart(targetId);
       } else if (attempts < 15) {
         attempts += 1;
         window.setTimeout(tryScroll, 50);
@@ -202,8 +225,7 @@ export default function App() {
 
       if (view === activeView) {
         if (sectionId) {
-          const el = document.getElementById(sectionId);
-          el?.scrollIntoView({ behavior: 'smooth' });
+          scrollToSectionStart(sectionId);
         } else {
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }

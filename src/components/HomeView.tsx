@@ -66,19 +66,26 @@ function ResilientImage({
     );
   }
 
+  const webpSrc = /\.(jpg|jpeg|png)$/i.test(src)
+    ? src.replace(/\.(jpg|jpeg|png)$/i, '.webp')
+    : null;
+
   return (
-    <img
-      src={src}
-      alt={alt}
-      width={width}
-      height={height}
-      loading={loading}
-      decoding="async"
-      fetchPriority={fetchPriority}
-      referrerPolicy="no-referrer"
-      onError={() => setFailed(true)}
-      className={className}
-    />
+    <picture className="block w-full h-full">
+      {webpSrc && <source srcSet={webpSrc} type="image/webp" />}
+      <img
+        src={src}
+        alt={alt}
+        width={width}
+        height={height}
+        loading={loading}
+        decoding="async"
+        fetchPriority={fetchPriority}
+        referrerPolicy="no-referrer"
+        onError={() => setFailed(true)}
+        className={className}
+      />
+    </picture>
   );
 }
 
@@ -222,8 +229,7 @@ export function HomeView({
         ? `Simulation ROI (${formatted} € / 90j) jointe aux notes de votre demande.`
         : `Simulação ROI (${formatted} € / 90d) anexada às notas do seu pedido.`
     );
-    const el = document.getElementById('diagnostico');
-    el?.scrollIntoView({ behavior: 'smooth' });
+    onNavigate('home', 'diagnostico');
   };
 
   const handleTransferCaseToForm = (sector: string, title: string) => {
@@ -241,8 +247,7 @@ export function HomeView({
         ? `Référence « ${sector} — ${title} » ajoutée à votre demande.`
         : `Referência "${sector} — ${title}" adicionada ao seu pedido.`
     );
-    const el = document.getElementById('diagnostico');
-    el?.scrollIntoView({ behavior: 'smooth' });
+    onNavigate('home', 'diagnostico');
   };
 
   const handlePrintRoi = () => {
@@ -388,6 +393,10 @@ export function HomeView({
               <div className="flex flex-wrap items-center gap-4 pt-2">
                 <a
                   href="#diagnostico"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onNavigate('home', 'diagnostico');
+                  }}
                   className="inline-flex items-center gap-2 px-6 py-3.5 rounded-lg bg-[#D96B43] hover:bg-[#B8532D] text-white font-semibold text-sm sm:text-base transition-colors whitespace-nowrap"
                 >
                   <span>{t.hero.ctaPrimary}</span>
@@ -395,6 +404,10 @@ export function HomeView({
                 </a>
                 <a
                   href="#simulador"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onNavigate('home', 'simulador');
+                  }}
                   className="inline-flex items-center px-5 py-3.5 rounded-lg bg-white hover:bg-slate-100 text-slate-900 border border-slate-300 font-semibold text-sm sm:text-base transition-colors whitespace-nowrap"
                 >
                   {t.hero.ctaSecondary}
@@ -459,7 +472,7 @@ export function HomeView({
       </section>
 
       {/* 2. APPROACH COMPARISON */}
-      <section id="abordagem" className="py-20 lg:py-24 bg-white border-b border-slate-200 scroll-mt-16">
+      <section id="abordagem" className="py-20 lg:py-24 bg-white border-b border-slate-200 scroll-mt-[65px]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-3xl mb-12">
             <p className="text-xs font-semibold uppercase tracking-wider text-[#D96B43]">{t.comparison.kicker}</p>
@@ -514,7 +527,7 @@ export function HomeView({
       </section>
 
       {/* 3. METHODOLOGY & 90-DAY ROADMAP */}
-      <section id="metodologia" className="py-20 lg:py-24 bg-[#F8F9FA] border-b border-slate-200 scroll-mt-16">
+      <section id="metodologia" className="py-20 lg:py-24 bg-[#F8F9FA] border-b border-slate-200 scroll-mt-[65px]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-20">
           {/* 4-Step Methodology */}
           <div>
@@ -635,6 +648,10 @@ export function HomeView({
               </div>
               <a
                 href="#diagnostico"
+                onClick={(e) => {
+                  e.preventDefault();
+                  onNavigate('home', 'diagnostico');
+                }}
                 className="px-5 py-3 rounded-lg bg-[#D96B43] hover:bg-[#B8532D] text-white font-semibold text-sm transition-colors whitespace-nowrap shrink-0"
               >
                 {t.roadmap.guaranteeCta}
@@ -645,7 +662,7 @@ export function HomeView({
       </section>
 
       {/* 4. FOUNDER, REAL CASE STUDIES & RECOMMENDATIONS */}
-      <section id="fundador" className="py-20 lg:py-24 bg-white border-b border-slate-200 scroll-mt-16">
+      <section id="fundador" className="py-20 lg:py-24 bg-white border-b border-slate-200 scroll-mt-[65px]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
           {/* Founder Profile */}
           <div className="rounded-2xl border border-slate-200 overflow-hidden grid lg:grid-cols-12 items-stretch">
@@ -657,17 +674,20 @@ export function HomeView({
                 <div className="flex items-center gap-5">
                   <div className="w-24 h-28 rounded-xl overflow-hidden bg-slate-800 border border-slate-700 shrink-0 flex items-center justify-center">
                     {!portraitError ? (
-                      <img
-                        src="/assets/aistudio/armandino_3d0f8cc6.png"
-                        alt="Armandino Seixas"
-                        width={96}
-                        height={112}
-                        loading="lazy"
-                        decoding="async"
-                        referrerPolicy="no-referrer"
-                        onError={() => setPortraitError(true)}
-                        className="w-full h-full object-cover"
-                      />
+                      <picture className="block w-full h-full">
+                        <source srcSet="/assets/aistudio/armandino_3d0f8cc6.webp" type="image/webp" />
+                        <img
+                          src="/assets/aistudio/armandino_3d0f8cc6.png"
+                          alt="Armandino Seixas"
+                          width={96}
+                          height={112}
+                          loading="lazy"
+                          decoding="async"
+                          referrerPolicy="no-referrer"
+                          onError={() => setPortraitError(true)}
+                          className="w-full h-full object-cover"
+                        />
+                      </picture>
                     ) : (
                       <span className="font-display font-bold text-2xl text-slate-300">AS</span>
                     )}
@@ -994,7 +1014,7 @@ export function HomeView({
       </section>
 
       {/* 5. INTERACTIVE ROI SIMULATOR */}
-      <section id="simulador" className="py-20 lg:py-24 bg-[#0F172A] text-white scroll-mt-16">
+      <section id="simulador" className="py-20 lg:py-24 bg-[#0F172A] text-white scroll-mt-[65px]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Executive Print-Only Letterhead */}
           <div className="hidden print:flex items-center justify-between border-b border-slate-300 pb-4 mb-6">
@@ -1137,7 +1157,7 @@ export function HomeView({
       </section>
 
       {/* 6. INDUSTRIAL TOOLS LIBRARY */}
-      <section id="ferramentas" className="py-20 lg:py-24 bg-[#F8F9FA] border-b border-slate-200 scroll-mt-16">
+      <section id="ferramentas" className="py-20 lg:py-24 bg-[#F8F9FA] border-b border-slate-200 scroll-mt-[65px]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-10">
             <div className="max-w-2xl">
@@ -1404,7 +1424,11 @@ export function HomeView({
 
             <a
               href="#diagnostico"
-              onClick={() => setSelectedTool(null)}
+              onClick={(e) => {
+                e.preventDefault();
+                setSelectedTool(null);
+                onNavigate('home', 'diagnostico');
+              }}
               className="block w-full text-center px-6 py-3.5 rounded-lg bg-[#D96B43] hover:bg-[#B8532D] text-white font-semibold text-sm transition-colors"
             >
               {t.toolsSection.modalCta}
@@ -1414,7 +1438,7 @@ export function HomeView({
       )}
 
       {/* 7. DIAGNOSTIC FORM & FAQ */}
-      <section id="diagnostico" className="py-20 lg:py-24 bg-white scroll-mt-16">
+      <section id="diagnostico" className="py-20 lg:py-24 bg-white scroll-mt-[65px]">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
           <div className="rounded-2xl border border-slate-200 overflow-hidden bg-[#F8F9FA]">
             <div className="bg-[#0F172A] px-6 sm:px-10 py-8 text-white">

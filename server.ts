@@ -164,11 +164,23 @@ async function startServer() {
     if (rawWebhook) {
       const safeUrl = isSafeHttpsWebhook(rawWebhook);
       if (safeUrl) {
+        const serialized = JSON.stringify(record);
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+        const webhookSecret = (process.env.DIAGNOSTIC_WEBHOOK_SECRET || '').trim();
+        if (webhookSecret) {
+          const sig = crypto
+            .createHmac('sha256', webhookSecret)
+            .update(serialized)
+            .digest('hex');
+          headers['X-OpEx-Signature'] = `sha256=${sig}`;
+        }
         try {
           await fetch(safeUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(record),
+            headers,
+            body: serialized,
             signal: AbortSignal.timeout(4000),
           });
         } catch {
