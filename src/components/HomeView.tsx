@@ -121,8 +121,9 @@ export function HomeView({
   // Lean Success Stories Modal state
   const [selectedCaseIdx, setSelectedCaseIdx] = useState<number | null>(null);
 
-  // FAQ accordion state
+  // FAQ accordion & filter state
   const [openFaqIdx, setOpenFaqIdx] = useState<number | null>(null);
+  const [activeFaqCategory, setActiveFaqCategory] = useState<string>('all');
 
   // Client Testimonials Carousel state
   const [activeTestimonialIdx, setActiveTestimonialIdx] = useState<number>(0);
@@ -1198,7 +1199,9 @@ export function HomeView({
                   <div className="flex items-center gap-2 text-xs text-slate-500 mb-3">
                     <span>{tool.tag[lang]}</span>
                     <span aria-hidden="true">·</span>
-                    <span className="font-mono font-semibold text-[#D96B43] tabular-nums">{tool.kpi}</span>
+                    <span className="font-mono font-semibold text-[#D96B43] tabular-nums">
+                      {typeof tool.kpi === 'string' ? tool.kpi : tool.kpi[lang]}
+                    </span>
                   </div>
                   <h3 className="font-display font-bold text-lg text-slate-950 group-hover:text-[#D96B43] transition-colors mb-2">
                     {tool.title[lang]}
@@ -1390,7 +1393,9 @@ export function HomeView({
                 <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
                   <span>{selectedTool.tag[lang]}</span>
                   <span aria-hidden="true">·</span>
-                  <span className="font-mono font-semibold text-[#D96B43]">{selectedTool.kpi}</span>
+                  <span className="font-mono font-semibold text-[#D96B43]">
+                    {typeof selectedTool.kpi === 'string' ? selectedTool.kpi : selectedTool.kpi[lang]}
+                  </span>
                 </div>
                 <h3 id="home-tool-modal-title" className="font-display font-extrabold text-2xl text-slate-950">
                   {selectedTool.title[lang]}
@@ -1724,45 +1729,88 @@ export function HomeView({
           </div>
 
           {/* FAQ */}
-          <div className="space-y-6">
-            <div>
+          <div id="faq" className="space-y-6 scroll-mt-24">
+            <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wider text-[#D96B43]">{t.faq.kicker}</p>
-              <h3 className="font-display font-extrabold text-2xl sm:text-3xl text-slate-950 mt-1">{t.faq.title}</h3>
+              <h3 className="font-display font-extrabold text-2xl sm:text-3xl text-slate-950">{t.faq.title}</h3>
+              {t.faq.subtitle && (
+                <p className="text-sm text-slate-600 leading-relaxed max-w-2xl">{t.faq.subtitle}</p>
+              )}
             </div>
-            <div className="divide-y divide-slate-200 border-t border-b border-slate-200">
-              {t.faq.items.map((item, idx) => {
-                const isOpen = openFaqIdx === idx;
-                const answerId = `faq-answer-${idx}`;
-                return (
-                  <div key={item.q} className="py-1">
+
+            {t.faq.categories && (
+              <div className="flex flex-wrap items-center gap-2 pt-1" role="tablist" aria-label="Categorias FAQ">
+                {t.faq.categories.map((cat) => {
+                  const isSelected = activeFaqCategory === cat.id;
+                  return (
                     <button
+                      key={cat.id}
                       type="button"
-                      onClick={() => setOpenFaqIdx(isOpen ? null : idx)}
-                      aria-expanded={isOpen}
-                      aria-controls={answerId}
-                      className="w-full py-4 flex items-center justify-between gap-4 text-left group cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D96B43]"
+                      role="tab"
+                      aria-selected={isSelected}
+                      onClick={() => {
+                        setActiveFaqCategory(cat.id);
+                        setOpenFaqIdx(null);
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#0F172A] text-white shadow-xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-950'
+                      }`}
                     >
-                      <h4
-                        className={`font-semibold text-base transition-colors ${
-                          isOpen ? 'text-[#D96B43]' : 'text-slate-950 group-hover:text-[#D96B43]'
-                        }`}
-                      >
-                        {item.q}
-                      </h4>
-                      <ChevronDown
-                        className={`w-5 h-5 shrink-0 transition-transform duration-200 ${
-                          isOpen ? 'rotate-180 text-[#D96B43]' : 'text-slate-400 group-hover:text-slate-700'
-                        }`}
-                      />
+                      {cat.label}
                     </button>
-                    {isOpen && (
-                      <div id={answerId} className="pb-5 pr-8">
-                        <p className="text-sm text-slate-600 leading-relaxed">{item.a}</p>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="divide-y divide-slate-200 border-t border-b border-slate-200">
+              {t.faq.items
+                .filter((item) => activeFaqCategory === 'all' || item.category === activeFaqCategory)
+                .map((item, idx) => {
+                  const isOpen = openFaqIdx === idx;
+                  const answerId = `faq-answer-${idx}`;
+                  const categoryObj = t.faq.categories?.find((c) => c.id === item.category);
+                  return (
+                    <div key={item.q} className="py-2">
+                      <button
+                        type="button"
+                        onClick={() => setOpenFaqIdx(isOpen ? null : idx)}
+                        aria-expanded={isOpen}
+                        aria-controls={answerId}
+                        className="w-full py-3.5 flex items-start justify-between gap-4 text-left group cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D96B43]"
+                      >
+                        <div className="space-y-1">
+                          {categoryObj && activeFaqCategory === 'all' && (
+                            <span className="inline-block text-[10px] font-mono font-semibold uppercase tracking-wider text-[#D96B43] bg-orange-50 px-2 py-0.5 rounded border border-orange-200/60">
+                              {categoryObj.label}
+                            </span>
+                          )}
+                          <h4
+                            className={`font-semibold text-base transition-colors leading-snug ${
+                              isOpen ? 'text-[#D96B43]' : 'text-slate-950 group-hover:text-[#D96B43]'
+                            }`}
+                          >
+                            {item.q}
+                          </h4>
+                        </div>
+                        <ChevronDown
+                          className={`w-5 h-5 shrink-0 mt-1 transition-transform duration-200 ${
+                            isOpen ? 'rotate-180 text-[#D96B43]' : 'text-slate-400 group-hover:text-slate-700'
+                          }`}
+                        />
+                      </button>
+                      {isOpen && (
+                        <div id={answerId} className="pb-5 pr-8 pl-1">
+                          <p className="text-sm text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-200/70">
+                            {item.a}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
             </div>
           </div>
         </div>

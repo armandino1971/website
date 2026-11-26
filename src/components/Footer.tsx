@@ -106,6 +106,11 @@ export function Footer({ lang, onChangeLang, onNavigate, onOpenCookieBanner }: F
                   {nav.tools}
                 </button>
               </li>
+              <li>
+                <button type="button" onClick={() => onNavigate('home', 'faq')} className="hover:text-white transition-colors cursor-pointer">
+                  {lang === 'fr' ? 'Foire Aux Questions (FAQ)' : 'Perguntas Frequentes (FAQ)'}
+                </button>
+              </li>
             </ul>
           </div>
 
@@ -140,8 +145,19 @@ export function Footer({ lang, onChangeLang, onNavigate, onOpenCookieBanner }: F
                 </a>
               </li>
               <li>
-                <a href={`mailto:${CONTACT_EMAIL}`} className="hover:text-white transition-colors">
-                  {CONTACT_EMAIL}
+                <a
+                  href={`mailto:${CONTACT_EMAIL}`}
+                  aria-label={`Email: ${CONTACT_EMAIL}`}
+                  title={`Email: ${CONTACT_EMAIL}`}
+                  className="inline-flex items-center hover:opacity-85 transition-opacity"
+                >
+                  <svg viewBox="0 0 24 24" className="w-6 h-6" aria-hidden="true">
+                    <rect width="24" height="24" rx="4" fill="#D96B43" />
+                    <path
+                      fill="#FFFFFF"
+                      d="M4 6.5A1.5 1.5 0 0 1 5.5 5h13A1.5 1.5 0 0 1 20 6.5v11a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5v-11Zm2.2.5 5.8 4.35L17.8 7H6.2Zm12.3 1.6-5.92 4.44a1 1 0 0 1-1.16 0L5.5 8.6V17.5c0 .28.22.5.5.5h12c.28 0 .5-.22.5-.5V8.6Z"
+                    />
+                  </svg>
                 </a>
               </li>
               <li>
@@ -162,7 +178,7 @@ export function Footer({ lang, onChangeLang, onNavigate, onOpenCookieBanner }: F
                   </svg>
                 </a>
               </li>
-              <li>Oeiras / Lisboa · Portugal</li>
+              <li>{lang === 'fr' ? 'Oeiras / Lisbonne · Portugal' : 'Oeiras / Lisboa · Portugal'}</li>
             </ul>
           </div>
         </div>

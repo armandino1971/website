@@ -9,7 +9,7 @@ export interface IndustrialTool {
   category: Exclude<ToolCategory, 'all'>;
   tag: Record<Language, string>;
   title: Record<Language, string>;
-  kpi: string;
+  kpi: Record<Language, string> | string;
   summary: Record<Language, string>;
   steps: Record<Language, string[]>;
 }
@@ -17,7 +17,7 @@ export interface IndustrialTool {
 export interface TechnicalToolSpec {
   key: string;
   principleTag: Record<Language, string>;
-  title: string;
+  title: Record<Language, string> | string;
   content: Record<
     Language,
     {

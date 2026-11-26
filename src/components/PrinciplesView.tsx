@@ -1704,7 +1704,7 @@ export function PrinciplesView({ lang, onNavigate }: PrinciplesViewProps) {
                   {drawerTool.principleTag[lang]}
                 </p>
                 <h3 id="drawer-tool-title" className="font-display font-extrabold text-xl text-white mt-1">
-                  {drawerTool.title}
+                  {typeof drawerTool.title === 'string' ? drawerTool.title : drawerTool.title[lang]}
                 </h3>
               </div>
               <button
